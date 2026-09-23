@@ -1,0 +1,16 @@
+# Secrets
+.env
+.env.*
+*.key
+*.pem
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*~
