@@ -196,3 +196,20 @@ GDB 脱离后，QEMU 串口日志继续输出 OpenSBI 信息和 `(THU.CST) os is
 - `logs/50-lab1-final-qemu-output.log`、`logs/51-lab1-final-qemu-check.log`：拆分后的普通 QEMU 原始输出、退出码和进程复核。
 - `logs/52-lab1-final-replay.gdb`、`logs/53-lab1-final-replay-qemu.log`、`logs/54-lab1-final-replay-gdb.log`、`logs/55-lab1-final-replay-cleanup.log`：关键启动链最终复跑。
 - `logs/56-lab1-final-cleanup.log`：清理构建产物和调试资源后的检查。
+
+## 第 7 节：实验报告与提示词记录
+
+### 目的与原因
+
+把执行证据整理成便于提交和讲解的实验报告，同时保留实际收到的用户任务与目录、命令约束。只填写能够由源码或运行日志证明的事实；不猜测组员学号姓名，也不伪造终端截图或 AI 编程迭代。
+
+### 完成内容
+
+- 将原通用模板改写为 Lab1 RISC-V 启动报告：说明环境、启动逻辑、每项验证的目的和结果、地址/符号、`make grade` 缺少脚本的原因，以及本次没有修改课程源码。
+- 在 `report/prompt.md` 按实际顺序记录本次任务和前序目录/命令约束，注明没有发生课程功能代码生成迭代。
+- 在报告中列出人工待填的学号/姓名，以及建议截取的四类真实终端画面；`report/images/` 当前仍只有 `.gitkeep`，没有生成或伪装截图。
+- 用 `git diff --check` 检查报告差异，没有空白错误；检查报告中的旧模板占位内容已删除，保留的待填项仅为个人信息和人工截图。
+
+### 结论
+
+报告正文与原始执行记录相互对应，截图和个人资料的待补事项明确。当前可直接用于本人核对、补充个人信息与截图后提交课程。
