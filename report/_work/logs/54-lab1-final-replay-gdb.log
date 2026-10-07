@@ -1,0 +1,57 @@
+The target architecture is set to "riscv:rv64".
+0x0000000000001000 in ?? ()
+
+=== QEMU reset vector ===
+$1 = 0x1000
+=> 0x1000:	auipc	t0,0x0
+   0x1004:	addi	a1,t0,32
+   0x1008:	csrr	a0,mhartid
+   0x100c:	ld	t0,24(t0)
+   0x1010:	jr	t0
+0x0000000000001004 in ?? ()
+0x0000000000001008 in ?? ()
+0x000000000000100c in ?? ()
+0x0000000000001010 in ?? ()
+0x0000000080000000 in ?? ()
+PC after five reset-ROM instructions: $2 = 0x80000000
+=> 0x80000000:	csrr	a6,mhartid
+   0x80000004:	bgtz	a6,0x80000108
+   0x80000008:	auipc	t0,0x0
+
+=== Stop at the kernel entry ===
+Breakpoint 1 at 0x80200000: file kern/init/entry.S, line 7.
+
+Breakpoint 1, kern_entry () at kern/init/entry.S:7
+7	    la sp, bootstacktop
+PC at kern_entry: $3 = 0x80200000
+=> 0x80200000 <kern_entry>:	auipc	sp,0x3
+   0x80200004 <kern_entry+4>:	mv	sp,sp
+   0x80200008 <kern_entry+8>:	j	0x8020000a <kern_init>
+SP before the entry instruction: $4 = 0x8001bd80
+bootstacktop symbol address: $5 = 0x80203000
+Breakpoint 2 at 0x8020000a: file kern/init/init.c, line 8.
+
+=== Execute stack setup ===
+0x0000000080200004 in kern_entry () at kern/init/entry.S:7
+7	    la sp, bootstacktop
+PC after auipc: $6 = 0x80200004
+SP after auipc: $7 = 0x80203000
+bootstacktop symbol address: $8 = 0x80203000
+STACK ASSERTION: PASS (sp equals bootstacktop)
+9	    tail kern_init
+PC after the second stack-setup instruction: $9 = 0x80200008
+SP after stack setup: $10 = 0x80203000
+
+=== Stop in the C initialization function ===
+
+Breakpoint 2, kern_init () at kern/init/init.c:8
+8	    memset(edata, 0, end - edata);
+PC at kern_init: $11 = 0x8020000a
+=> 0x8020000a <kern_init>:	auipc	a0,0x3
+   0x8020000e <kern_init+4>:	addi	a0,a0,-2
+   0x80200012 <kern_init+8>:	auipc	a2,0x3
+   0x80200016 <kern_init+12>:	addi	a2,a2,-10
+SP at kern_init: $12 = 0x80203000
+bootstacktop symbol address: $13 = 0x80203000
+KERNEL ENTRY ASSERTION: PASS (PC equals kern_init)
+[Inferior 1 (process 1) detached]

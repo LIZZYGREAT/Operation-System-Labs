@@ -1,0 +1,10 @@
+$ make clean
+rm -f -r obj bin
+exit code: 0
+
+$ check generated build directories
+bin/ and obj/ are absent
+
+$ check QEMU and GDB listener
+no QEMU processes
+port 1234 is closed

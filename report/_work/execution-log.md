@@ -162,3 +162,37 @@ GDB 脱离后，QEMU 串口日志继续输出 OpenSBI 信息和 `(THU.CST) os is
 - `logs/38-lab1-qemu-debug.log`、`logs/38-lab1-reset-vector.gdb`、`logs/39-lab1-reset-vector.log`、`logs/40-lab1-reset-cleanup.log`：复位地址单步检查及清理。
 - `logs/41-lab1-startup-trace.gdb`、`logs/42-lab1-qemu-debug.log`、`logs/44-lab1-startup-cleanup.log`：首次完整跟踪启动时发现的 PATH 问题及清理结果。
 - `logs/45-lab1-qemu-debug.log`、`logs/46-lab1-startup-trace.log`、`logs/47-lab1-startup-cleanup.log`：成功的完整 GDB 跟踪、QEMU 输出及清理检查。
+
+## 第 6 节：干净重建、最终复跑与收尾
+
+### 目的与原因
+
+为了避免第一次调试结果偶然成功，在最终复核中重新清理并完整构建，再分别重跑普通 QEMU 和带 GDB 的启动链。静态 ELF 检查用于确认新产物入口未变；GDB 命令脚本重复检查关键 PC、SP 断言和 C 入口；最后删除生成目录并确认无调试进程/端口残留，使仓库回到实验前的构建产物状态。
+
+### 执行命令与结果
+
+| 命令 | 退出码 | 关键结果 |
+|---|---:|---|
+| `make clean`；`make`（`code/`，课程工具路径显式加入 PATH） | 0 | 从零编译、链接 `bin/kernel`、生成 `bin/ucore.img` |
+| `file bin/kernel bin/ucore.img` | 0 | 重新生成的 kernel 为 ELF64 RISC-V；镜像为 raw data |
+| `readelf -h bin/kernel` 筛选 Machine/Entry | 0 | `Machine: RISC-V`，入口 `0x80200000` |
+| `nm -n bin/kernel` 筛选关键符号 | 0 | `kern_entry=0x80200000`，`kern_init=0x8020000a`，`bootstacktop=0x80203000` |
+| `timeout 10s make qemu`（分开保存原始输出和复核结果） | 124（预期） | OpenSBI 启动后输出 ucore 提示；超时结束后无 QEMU 残留 |
+| `riscv64-unknown-elf-gdb -q -batch -x logs/52-lab1-final-replay.gdb` | 0 | 再次得到 `0x1000 → 0x80000000 → 0x80200000 → 0x8020000a`；SP 断言和入口断言通过 |
+| GDB 脱离后等待串口输出 | — | OpenSBI 与 `(THU.CST) os is loading ...` 均出现在本次复跑日志 |
+| `make clean` | 0 | `code/bin/`、`code/obj/` 已移除，返回实验前无构建产物的状态 |
+| 检查 QEMU 进程和 `:1234` | 0 | 无 QEMU 进程，GDB 端口已关闭 |
+
+第一次编写最终 QEMU 复核包装命令时，脚本试图一边向日志写入一边从同一个日志读取，`grep` 报 `input file is also the output`。这不影响 QEMU 实验本身（当次仍观察到预期退出码和内核输出）；随后将原始输出与检查结果拆成两个文件，复核命令退出 0。原尝试和修正后的证据都保留，便于追溯。
+
+### 最终结论
+
+干净构建、静态 ELF 检查、普通 QEMU 启动和 GDB 关键路径复跑全部通过。运行地址和栈指针结果可重复，与启动源码及链接符号吻合。最终没有修改课程 C/汇编源码，构建和调试产物已清理。
+
+### 原始输出和命令
+
+- `logs/48-lab1-final-clean-build-static.log`：最终干净构建及 ELF/符号检查。
+- `logs/49-lab1-final-qemu.log`：初次最终输出检查包装错误；QEMU 原始输出见该文件本身。
+- `logs/50-lab1-final-qemu-output.log`、`logs/51-lab1-final-qemu-check.log`：拆分后的普通 QEMU 原始输出、退出码和进程复核。
+- `logs/52-lab1-final-replay.gdb`、`logs/53-lab1-final-replay-qemu.log`、`logs/54-lab1-final-replay-gdb.log`、`logs/55-lab1-final-replay-cleanup.log`：关键启动链最终复跑。
+- `logs/56-lab1-final-cleanup.log`：清理构建产物和调试资源后的检查。
