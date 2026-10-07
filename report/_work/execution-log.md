@@ -125,3 +125,40 @@
 
 - `logs/36-lab1-qemu.log`
 
+
+## 第 5 节：GDB 动态跟踪启动链与栈初始化
+
+### 目的与原因
+
+静态符号只能说明预期地址，不能证明 QEMU 实际按该路径执行。先从复位 ROM 单步进入 OpenSBI，再用符号断点等待固件跳入内核；在 `kern_entry` 逐条执行栈设置指令，并在 `kern_init` 断点检查 PC 和 SP。这样可以把源码、链接地址与运行时寄存器对应起来。
+
+### 调试过程与偏差
+
+1. 默认受限环境中的 `setsid make debug` 无法创建 QEMU 的本机 GDB socket，输出 `Failed to create a socket: Operation not permitted`。该尝试没有启动调试目标；之后在显式允许本机 `localhost:1234` 的隔离命令中重试。
+2. 第一次扩大范围的调试启动因后台非交互 shell 没有课程工具目录 PATH，输出 `qemu-system-riscv64: No such file or directory`。确认是命令搜索路径问题后，在重试中明确加入 `/home/lenovo/os-lab/qemu/current/bin` 与 `/home/lenovo/os-lab/toolchain/current/bin`。没有因此改动课程 Makefile。
+3. 成功会话使用 `setsid make debug` 创建独立进程组，GDB 以 `-batch -x logs/41-lab1-startup-trace.gdb` 执行记录好的断点和检查命令。完整输出在 `logs/46-lab1-startup-trace.log`。
+
+### 观测结果
+
+| 检查点 | 运行时结果 | 含义 |
+|---|---|---|
+| QEMU 复位开始 | `PC=0x1000` | CPU 从 QEMU reset ROM 开始执行 |
+| 对复位 ROM 单步 5 次 | `PC=0x80000000` | 控制流进入 OpenSBI 固件 |
+| 命中 `kern_entry` | `PC=0x80200000` | 固件进入 ELF 的内核入口 |
+| 执行 `auipc sp,0x3` 前 | `sp=0x8001bd80`；`bootstacktop=0x80203000` | 入口执行前 SP 仍是固件使用的栈地址 |
+| 执行入口第一条指令后 | `PC=0x80200004`；`sp=0x80203000` | 汇编已把 SP 设置到内核栈顶；GDB 相等断言通过 |
+| 执行第二条指令后 | `PC=0x80200008`；`sp=0x80203000` | SP 保持在内核栈顶，下一条跳转指向 `kern_init` |
+| 命中 `kern_init` | `PC=0x8020000a`；`sp=0x80203000` | C 初始化入口地址正确，SP 与 `bootstacktop` 相同；GDB 入口断言通过 |
+
+GDB 脱离后，QEMU 串口日志继续输出 OpenSBI 信息和 `(THU.CST) os is loading ...`。随后终止本次独立进程组；检查确认没有遗留 QEMU 进程或 `:1234` 监听端口。
+
+### 结论
+
+动态启动路径与静态分析一致：`0x1000 → 0x80000000 → 0x80200000 → kern_entry → 0x8020000a (kern_init)`。在 `kern_entry` 的第一条指令后，`sp` 已变为 `bootstacktop=0x80203000`；进入 `kern_init` 时该值仍成立。本节通过。后续将按计划再做一次干净构建和关键路径复跑，作为最终复核。
+
+### 原始输出和命令
+
+- `logs/37-lab1-qemu-debug.log`、`logs/37-lab1-qemu-debug-state.log`：默认沙箱本机 socket 限制及进程状态。
+- `logs/38-lab1-qemu-debug.log`、`logs/38-lab1-reset-vector.gdb`、`logs/39-lab1-reset-vector.log`、`logs/40-lab1-reset-cleanup.log`：复位地址单步检查及清理。
+- `logs/41-lab1-startup-trace.gdb`、`logs/42-lab1-qemu-debug.log`、`logs/44-lab1-startup-cleanup.log`：首次完整跟踪启动时发现的 PATH 问题及清理结果。
+- `logs/45-lab1-qemu-debug.log`、`logs/46-lab1-startup-trace.log`、`logs/47-lab1-startup-cleanup.log`：成功的完整 GDB 跟踪、QEMU 输出及清理检查。

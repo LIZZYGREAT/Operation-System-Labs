@@ -1,0 +1,39 @@
+The target architecture is set to "riscv:rv64".
+0x0000000000001000 in ?? ()
+
+=== Initial reset PC ===
+$1 = 0x1000
+=> 0x1000:	auipc	t0,0x0
+   0x1004:	addi	a1,t0,32
+   0x1008:	csrr	a0,mhartid
+   0x100c:	ld	t0,24(t0)
+   0x1010:	jr	t0
+   0x1014:	unimp
+   0x1016:	unimp
+   0x1018:	unimp
+
+=== Single-step reset ROM ===
+0x0000000000001004 in ?? ()
+$2 = 0x1004
+0x0000000000001008 in ?? ()
+$3 = 0x1008
+0x000000000000100c in ?? ()
+$4 = 0x100c
+0x0000000000001010 in ?? ()
+$5 = 0x1010
+0x0000000080000000 in ?? ()
+$6 = 0x80000000
+
+=== Instructions at resulting PC ===
+=> 0x80000000:	csrr	a6,mhartid
+   0x80000004:	bgtz	a6,0x80000108
+   0x80000008:	auipc	t0,0x0
+   0x8000000c:	addi	t0,t0,1032
+   0x80000010:	auipc	t1,0x0
+   0x80000014:	addi	t1,t1,-16
+   0x80000018:	sd	t1,0(t0)
+   0x8000001c:	auipc	t0,0x0
+[Inferior 1 (process 1) detached]
+
+command: gdb -q -batch -x logs/38-lab1-reset-vector.gdb
+exit code: 0
