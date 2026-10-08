@@ -1,3 +1,0 @@
-rm -f -r obj bin
-command: make clean
-exit code: 0

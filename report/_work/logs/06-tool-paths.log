@@ -1,3 +1,0 @@
-riscv64-unknown-elf-gcc: riscv64-unknown-elf-gdb: qemu-system-riscv64: make: /usr/bin/make
-riscv64-unknown-elf-readelf: riscv64-unknown-elf-nm: riscv64-unknown-elf-objdump: 
-[exit code: 0]

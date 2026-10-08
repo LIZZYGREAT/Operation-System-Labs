@@ -1,7 +1,0 @@
-Command: git status --short --branch
-Working directory: /home/lenovo/os-lab/workspace
-Exit code: 128
-Output:
-fatal: not a git repository (or any of the parent directories): .git
-
-Resolution: the repository is nested at /home/lenovo/os-lab/workspace/Operation-System-Labs; subsequent Git commands ran there.

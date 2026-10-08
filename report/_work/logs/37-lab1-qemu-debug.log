@@ -1,2 +1,0 @@
-qemu-system-riscv64: -s: Failed to create a socket: Operation not permitted
-make: *** [Makefile:169: debug] Error 1

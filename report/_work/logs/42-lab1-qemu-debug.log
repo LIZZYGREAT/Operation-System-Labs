@@ -1,2 +1,0 @@
-make: qemu-system-riscv64: No such file or directory
-make: *** [Makefile:169: debug] Error 127

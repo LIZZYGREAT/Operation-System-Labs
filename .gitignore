@@ -14,3 +14,11 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# Build artifacts (regenerate with `make`)
+code/bin/
+code/obj/
+
+# Raw execution logs (kept locally, not submitted)
+# 注意：report/_work/ 下的学习笔记与执行记录要提交，只忽略原始日志目录
+report/_work/logs/
