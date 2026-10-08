@@ -5,14 +5,18 @@
 | 项目 | 内容 |
 |---|---|
 | 实验名称 | Lab1：RISC-V 内核启动与调试 |
-| 小组成员 | `[请本人填写：学号-姓名]` |
-| 完成日期 | 2026-10-07 |
+| 小组成员 | 甘文杰 2412700、王子楸 2412712、向宇航 2413318 |
+| 完成日期 | 2026-10-07 至 2026-10-08 |
 | 仓库分支 | `work/lab1/wenjie` |
-| 实验记录 | [逐步执行记录](./_work/execution-log.md) |
+| 实验记录 | `report/_work/`（学习笔记与执行记录随仓库提交；`logs/` 原始终端日志仅本地保留） |
 
 ### 小组分工
 
-本次记录只覆盖当前工作区内完成的 Lab1 启动验证。成员姓名、学号和分工请根据实际小组情况填写；执行环境没有提供这些个人信息，因此这里不代填。
+| 成员 | 学号 | 本次 Lab1 分工 |
+|---|---|---|
+| 甘文杰 | 2412700 | 在 `work/lab1/wenjie` 分支完成 Lab1 启动验证（构建、静态检查、QEMU 运行、GDB 启动链跟踪）并整理记录 |
+| 王子楸 | 2412712 | 前期环境搭建（RISC-V 工具链与 QEMU 安装、PATH 配置）、项目流程与相关知识梳理 |
+| 向宇航 | 2413318 | 复核完成过程有无问题、独立二次复现、报告整理 |
 
 ## 一、实验目的
 
@@ -32,7 +36,7 @@
 | QEMU | `qemu-system-riscv64` 4.1.1 |
 | 工具安装位置 | `~/os-lab/toolchain/current`、`~/os-lab/qemu/current` |
 | 实验代码目录 | `Operation-System-Labs/code/` |
-| AI 工具 | Codex（GPT-6 系列） |
+| AI 工具 | Codex、Claude Code（deepseek-flash） |
 
 调试命令使用 `localhost:1234` 连接 QEMU GDB stub。受限执行环境第一次禁止创建该本机 socket；在受控的本机调试运行中重试后通过。后台非交互 shell 也曾未继承工具目录 PATH，显式加入 `~/os-lab` 下的 QEMU 和工具链目录后解决。整个 Lab1 验证没有遇到需要 `sudo` 或外网下载的问题。
 
@@ -64,7 +68,7 @@ QEMU 的 `qemu` 目标通过 `-machine virt -nographic -bios default` 启用 vir
 
 **目的：** 确认当前分支、起始提交和已有未跟踪内容，再从源码建立待验证的启动路径，避免误删工作区原有记录或把源码推断当作运行证据。
 
-**检查结果：** 当前分支为 `work/lab1/wenjie`，起始提交为 Starter Code `230c83e`。开始时已有未跟踪的 `report/_work/` 环境记录；本次保留这些文件，只新增并提交明确列出的 Lab1 记录。`code/tools/` 中没有 `grade.sh`。
+**检查结果：** 当前分支为 `work/lab1/wenjie`，起始提交为 Starter Code `230c83e`。开始时已有未跟踪的 `report/_work/` 环境记录；本次保留这些文件，其中学习笔记与执行记录随仓库提交，`logs/` 下的原始终端日志仅本地保留。`code/tools/` 中没有 `grade.sh`。
 
 **课程代码改动：** 没有修改 C、汇编或 Makefile。Starter Code 已具备本实验需要验证的最小启动路径，故本次重点是构建、静态检查和动态验证，避免为通过验证而改动课程代码。
 
@@ -84,6 +88,18 @@ QEMU 的 `qemu` 目标通过 `-machine virt -nographic -bios default` 启用 vir
 
 ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU loader 使用的裸镜像。链接地址与 Makefile 的加载地址均为 `0x80200000`，两者一致。
 
+![干净构建输出](./images/01-build-success.png)
+
+*图 01：`make clean && make` 的完整输出，含 8 条 `+ cc`、`+ ld bin/kernel` 与 objcopy 生成裸镜像；下方 `file` 输出显示 `bin/kernel` 为 ELF 而 `bin/ucore.img` 为 data。*
+
+![静态 ELF 入口与入口反汇编](./images/02-static-elf-entry.png)
+
+*图 02：`readelf -h` 显示 `Entry point address: 0x80200000`、`Machine: RISC-V`；`objdump -d` 显示 `kern_entry` 展开为 `auipc sp,0x3` 与 `mv sp,sp`，`tail kern_init` 跳转到 `0x8020000a`。*
+
+![静态符号表](./images/03-static-elf-symbols.png)
+
+*图 03：`nm -n` 的关键符号地址——`kern_entry=0x80200000`、`kern_init=0x8020000a`、`bootstack=0x80201000`、`bootstacktop=0x80203000`、`edata=end=0x80203008`。*
+
 ### 4.3 普通 QEMU 启动
 
 **目的：** 不连接 GDB，先确认默认 OpenSBI 固件和内核可以在 QEMU 中完成启动。
@@ -91,6 +107,10 @@ ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU
 **命令：** `timeout 10s make qemu`。命令在 10 秒后返回 124，因为 `kern_init` 按设计进入无限循环；判定启动结果时检查控制台输出和遗留进程。
 
 **结果：** 控制台先输出 OpenSBI v0.4 和 QEMU virt 平台信息，再输出 `(THU.CST) os is loading ...`。超时后无残留 QEMU 进程。最终复跑也观察到相同输出。
+
+![普通 QEMU 启动输出](./images/04-qemu-start.png)
+
+*图 04：OpenSBI v0.4 横幅与 QEMU virt 平台信息，含 `Firmware Base: 0x80000000`、`PMP0: 0x80000000-0x801fffff`（这正是内核地址 `0x80200000` 的由来），末尾为 ucore 的 `(THU.CST) os is loading ...`；退出码 124 与“无残留 QEMU 进程”也在画面内。*
 
 ### 4.4 GDB 启动链与栈检查
 
@@ -110,11 +130,29 @@ ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU
 
 GDB 脱离后让目标继续运行，QEMU 串口仍输出 ucore 启动信息。结束时检查无 QEMU 进程，`localhost:1234` 端口已关闭。
 
+![GDB 复位地址](./images/05-gdb-reset-vector.png)
+
+*图 05：GDB 连接 `localhost:1234` 后初始 `PC = 0x1000`，并列出 reset ROM 的 5 条指令。*
+
+![PC 到达 OpenSBI 入口](./images/06-gdb-opensbi.png)
+
+*图 06：在 reset ROM 上单步 5 次，PC 依次经过 `0x1004`→`0x1008`→`0x100c`→`0x1010` 到达 `0x80000000`，进入 OpenSBI 固件区域。*
+
+![kern_entry 栈切换](./images/07-gdb-kernel-entry.png)
+
+*图 07：命中 `kern_entry`（`PC=0x80200000`）时 `sp=0x8001bd80`（仍是固件栈），`&bootstacktop=0x80203000`；执行第一条指令 `auipc sp,0x3` 后 `sp=0x80203000`，与 `bootstacktop` 相等，断言成立。*
+
+![进入 kern_init](./images/08-gdb-kern-init.png)
+
+*图 08：继续后在 `kern_init` 命中，`PC=0x8020000a`，`sp` 仍为 `0x80203000`；继续运行后串口输出启动信息。*
+
 ### 4.5 AI 协作与迭代记录
 
-本次任务以 Starter Code 验证和实验报告整理为主，没有让 AI 实现课程功能，也没有修改课程源码。因此不存在可如实报告的代码生成迭代次数或功能实现提示词。`report/prompt.md` 保留了实际用户任务与执行约束，没有编造模型对话。逐步执行记录和每次环境诊断见 [execution-log.md](./_work/execution-log.md)。
+本次任务以 Starter Code 验证和实验报告整理为主，没有让 AI 实现课程功能，也没有修改课程源码。因此不存在可如实报告的代码生成迭代次数或功能实现提示词。`report/prompt.md` 保留了实际用户任务、目录约束与逐条追问，没有编造模型对话。逐步执行记录见 `report/_work/execution-log.md`（随仓库提交），每次环境诊断的原始输出保存在 `report/_work/logs/`（仅本地保留）。
 
 ## 五、测试与验证
+
+下表"证据"列引用的是本次实验的原始日志文件名。完整日志保存在工作区 `report/_work/logs/`，属于过程记录、不纳入 Git 提交；报告正文保留了各项验证的结论与对应日志编号，便于本人复现时对照。
 
 | 验证项目 | 结果 | 证据 |
 |---|---|---|
@@ -124,16 +162,22 @@ GDB 脱离后让目标继续运行，QEMU 串口仍输出 ucore 启动信息。�
 | GDB 地址链、栈和 C 入口 | 通过；两项 GDB 断言均通过 | `_work/logs/54-lab1-final-replay-gdb.log`、`_work/logs/55-lab1-final-replay-cleanup.log` |
 | `make grade` | 未运行 | Makefile 的 `grade` 目标会调用缺失的 `tools/grade.sh`，因此没有运行该目标 |
 
-### 截图待补
+### 实验截图
 
-当前 `report/images/` 中只有 `.gitkeep`，没有真实终端截图。请报告提交前从实际终端/调试器截取并保存以下内容，再把表中占位状态替换成对应图片，不能用日志文本伪装截图：
+`report/images/` 中保存了 8 张真实终端截图，按实验顺序编号，全部为实际终端/调试器画面，未使用日志文本伪造。
 
-| 建议文件名 | 截图内容 | 状态 |
+命名约定：统一使用**两位数字前缀 + 语义名**，本报告只引用下表列出的文件，图片路径写作 `./images/<文件名>`。
+
+| 文件名 | 截图内容 | 对应小节 |
 |---|---|---|
-| `lab1-build.png` | `make clean` 和 `make` 成功输出 | 待本人截图 |
-| `lab1-qemu.png` | OpenSBI 与 ucore 启动信息 | 待本人截图 |
-| `lab1-gdb-reset.png` | GDB 初始 PC `0x1000` 及 OpenSBI 地址 `0x80000000` | 待本人截图 |
-| `lab1-gdb-kernel.png` | `kern_entry`、`sp=bootstacktop=0x80203000` 与 `kern_init` | 待本人截图 |
+| `01-build-success.png` | `make clean` 和 `make` 成功输出 | 4.2 |
+| `02-static-elf-entry.png` | `readelf -h` 入口地址与 `kern_entry` 反汇编 | 4.2 |
+| `03-static-elf-symbols.png` | `nm -n` 关键符号地址 | 4.2 |
+| `04-qemu-start.png` | OpenSBI v0.4 横幅与 ucore 启动信息 | 4.3 |
+| `05-gdb-reset-vector.png` | GDB 初始 PC `0x1000` 及 reset ROM 反汇编 | 4.4 |
+| `06-gdb-opensbi.png` | PC 到达固件区域 `0x80000000` | 4.4 |
+| `07-gdb-kernel-entry.png` | `kern_entry`、`sp` 切换为 `bootstacktop=0x80203000` | 4.4 |
+| `08-gdb-kern-init.png` | 命中 `kern_init`，`PC=0x8020000a` | 4.4 |
 
 ## 六、实验总结与收获
 
