@@ -1,0 +1,7 @@
+Command: git status --short --branch
+Working directory: /home/lenovo/os-lab/workspace/Operation-System-Labs
+Exit code: 0
+Captured output from the initial pre-work check:
+## work/lab1/wenjie
+
+This check occurred before report/_work/ was created. The initial working tree was clean.

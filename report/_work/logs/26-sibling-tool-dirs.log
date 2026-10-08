@@ -1,0 +1,11 @@
+../../qemu:
+total 8
+drwxr-xr-x 2 lenovo lenovo 4096 Sep 29 14:56 .
+drwxr-xr-x 5 lenovo lenovo 4096 Oct  7 14:52 ..
+
+../../toolchain:
+total 8
+drwxr-xr-x 2 lenovo lenovo 4096 Sep 29 14:56 .
+drwxr-xr-x 5 lenovo lenovo 4096 Oct  7 14:52 ..
+
+[exit code: 0]

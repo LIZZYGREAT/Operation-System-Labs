@@ -1,0 +1,5 @@
+binutils-riscv64-unknown-elf - GNU assembler, linker and binary utilities for RISC-V processors
+gcc-riscv64-unknown-elf - GCC compiler for embedded RISC-V chips
+picolibc-riscv64-unknown-elf - Smaller embedded C library for RISC-V development
+
+[exit code: 0]

@@ -1,0 +1,8 @@
+Intended command: make clean (working directory: code)
+Capture wrapper failed before invoking make because it tried to open report/_work/logs/... relative to code/.
+Observed output:
+/bin/bash: line 1: report/_work/logs/21-make-clean.log: No such file or directory
+/bin/bash: line 1: report/_work/logs/21-make-clean.log: No such file or directory
+cat: report/_work/logs/21-make-clean.log: No such file or directory
+Wrapper exit code: 1
+Result: make clean was not run in this attempt; no build files were touched.

@@ -1,0 +1,7 @@
+readelf: /usr/bin/readelf
+nm: /usr/bin/nm
+objdump: /usr/bin/objdump
+clang: /usr/bin/clang
+llvm-objdump: llvm-readelf: docker: /mnt/c/Program Files/Docker/Docker/resources/bin/docker
+podman: 
+[exit code: 0]

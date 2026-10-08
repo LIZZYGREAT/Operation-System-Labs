@@ -1,0 +1,33 @@
+gcc-riscv64-unknown-elf:
+  Installed: (none)
+  Candidate: 10.2.0-0ubuntu1
+  Version table:
+     10.2.0-0ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages
+binutils-riscv64-unknown-elf:
+  Installed: (none)
+  Candidate: 2.35.1-0ubuntu1
+  Version table:
+     2.35.1-0ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages
+gdb-multiarch:
+  Installed: (none)
+  Candidate: 12.1-0ubuntu1~22.04.2
+  Version table:
+     12.1-0ubuntu1~22.04.2 500
+        500 http://archive.ubuntu.com/ubuntu jammy-updates/universe amd64 Packages
+        500 http://security.ubuntu.com/ubuntu jammy-security/universe amd64 Packages
+     12.0.90-0ubuntu1 500
+        500 http://archive.ubuntu.com/ubuntu jammy/universe amd64 Packages
+qemu-system-misc:
+  Installed: (none)
+  Candidate: 1:6.2+dfsg-2ubuntu6.31
+  Version table:
+     1:6.2+dfsg-2ubuntu6.31 500
+        500 http://archive.ubuntu.com/ubuntu jammy-updates/main amd64 Packages
+     1:6.2+dfsg-2ubuntu6.30 500
+        500 http://security.ubuntu.com/ubuntu jammy-security/main amd64 Packages
+     1:6.2+dfsg-2ubuntu6 500
+        500 http://archive.ubuntu.com/ubuntu jammy/main amd64 Packages
+
+[exit code: 0]

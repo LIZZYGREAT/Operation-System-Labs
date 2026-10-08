@@ -1,0 +1,22 @@
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/kern/driver/console.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/kern/libs/stdio.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/kern/init/init.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/kern/init/entry.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/libs/string.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/libs/sbi.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/libs/readline.d'
+/bin/sh: 1: riscv64-unknown-elf-gcc: not found
+make: *** Deleting file 'obj/libs/printfmt.d'
++ cc kern/init/entry.S
+make: riscv64-unknown-elf-gcc: No such file or directory
+make: *** [Makefile:112: obj/kern/init/entry.o] Error 127
+
+[command: make]
+[exit code: 2]

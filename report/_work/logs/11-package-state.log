@@ -1,0 +1,7 @@
+dpkg-query: no packages found matching gcc-riscv64*
+dpkg-query: no packages found matching binutils-riscv64*
+dpkg-query: no packages found matching gdb-multiarch
+dpkg-query: no packages found matching qemu-system-misc
+dpkg-query: no packages found matching qemu-system-riscv64
+
+[exit code: 1]
