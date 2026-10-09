@@ -38,7 +38,7 @@
 | 实验代码目录 | `Operation-System-Labs/code/` |
 | AI 工具 | Codex、Claude Code（deepseek-flash） |
 
-调试命令使用 `localhost:1234` 连接 QEMU GDB stub。受限执行环境第一次禁止创建该本机 socket；在受控的本机调试运行中重试后通过。后台非交互 shell 也曾未继承工具目录 PATH，显式加入 `~/os-lab` 下的 QEMU 和工具链目录后解决。整个 Lab1 验证没有遇到需要 `sudo` 或外网下载的问题。
+GDB 通过 `localhost:1234` 连接 QEMU。
 
 ## 三、实验整体逻辑分析
 
@@ -48,31 +48,36 @@
 QEMU reset ROM 0x1000
         ↓
 OpenSBI firmware 0x80000000
-        ↓
-ucore ELF 入口 kern_entry 0x80200000
+        ↓（QEMU loader 已将 ucore.img 放到 0x80200000）
+ucore 入口 kern_entry 0x80200000
         ↓
 设置 sp = bootstacktop = 0x80203000
         ↓
 kern_init 0x8020000a
         ↓
-清零 BSS、输出启动信息并保持运行
+调用 cprintf，经 SBI 输出启动信息并保持运行
 ```
 
-QEMU 的 `qemu` 目标通过 `-machine virt -nographic -bios default` 启用 virt 机器和默认固件，再把 `bin/ucore.img` 加载到 `0x80200000`。`debug` 目标另外使用 `-s -S`：开启 GDB stub 并让 CPU 初始暂停。GDB 读取 `bin/kernel`，使用其中的 ELF 符号设置 `kern_entry`、`kern_init` 断点。
+OpenSBI 的工作可以概括为加载并启动内核；结合本次 `Makefile` 的具体配置，`-device loader,file=...,addr=0x80200000` 会由 QEMU 在执行前把 `ucore.img` 放到内存中，OpenSBI 完成固件初始化后再把控制权交给内核。`debug` 目标还使用 `-s -S` 开启 GDB stub 并暂停 CPU；GDB 读取 `bin/kernel` 中的 ELF 符号来定位 `kern_entry` 和 `kern_init`。
 
-链接脚本 `code/tools/kernel.ld` 把 `kern_entry` 设为 ELF 入口，并从 `0x80200000` 开始布局。`code/kern/init/entry.S` 先把 `sp` 设为 `bootstacktop`，再跳到 `kern_init`。`code/kern/init/init.c` 清零 `[edata, end)`，输出 `(THU.CST) os is loading ...`，随后进入无限循环。因此普通运行预期不会自行退出，测试用超时结束 QEMU 属于预期控制方式。
+链接脚本 `code/tools/kernel.ld` 把 `kern_entry` 设为 ELF 入口，并从 `0x80200000` 开始布局。`code/kern/init/entry.S` 设置内核栈后跳到 `kern_init`。`kern_init` 调用 `memset(edata, 0, end - edata)`，再输出 `(THU.CST) os is loading ...` 并进入无限循环。
+
+### 关键函数与模块
+
+| 文件或函数 | 在本实验中的作用 |
+|---|---|
+| `tools/kernel.ld` | 指定 ELF 入口 `kern_entry` 和内核基址 `0x80200000`，安排各 section，并提供 `edata`、`end` 等链接符号。 |
+| `kern/init/entry.S:kern_entry` | 将 `sp` 设为 `bootstacktop`，再通过 `tail kern_init` 转入 C 初始化函数。 |
+| `kern/init/init.c:kern_init` | 尝试清零 `[edata, end)`，调用 `cprintf` 输出启动信息，之后停在循环中。 |
+| `kern/libs/stdio.c:cprintf`、`libs/printfmt.c:vprintfmt` | 解析格式字符串并逐字符输出，提供内核自己的格式化输出。 |
+| `kern/driver/console.c:cons_putc`、`libs/sbi.c:sbi_call` | 将字符输出请求转成 SBI 调用，把服务号放入 `x17`、参数放入 `x10` 至 `x12`，再通过 `ecall` 请求 OpenSBI 提供控制台服务。 |
+| `Makefile` 的 `qemu`、`debug`、`gdb` 目标 | 分别构建并启动 QEMU、暂停目标供调试，以及加载 ELF 符号后连接 GDB。 |
+
+因此，启动信息的调用路径是 `cprintf → vprintfmt → cons_putc → sbi_console_putchar → sbi_call → ecall`,从而实现让内核通过 OpenSBI 提供的接口输出字符。
 
 ## 四、实验内容与实现
 
-### 4.1 仓库与源码检查
-
-**目的：** 确认当前分支、起始提交和已有未跟踪内容，再从源码建立待验证的启动路径，避免误删工作区原有记录或把源码推断当作运行证据。
-
-**检查结果：** 当前分支为 `work/lab1/wenjie`，起始提交为 Starter Code `230c83e`。开始时已有未跟踪的 `report/_work/` 环境记录；本次保留这些文件，其中学习笔记与执行记录随仓库提交，`logs/` 下的原始终端日志仅本地保留。`code/tools/` 中没有 `grade.sh`。
-
-**课程代码改动：** 没有修改 C、汇编或 Makefile。Starter Code 已具备本实验需要验证的最小启动路径，故本次重点是构建、静态检查和动态验证，避免为通过验证而改动课程代码。
-
-### 4.2 干净构建与静态检查
+### 4.1 干净构建与静态检查
 
 **目的：** 先删除构建输出再编译，以确认结果来自当前源码；随后检查 ELF 架构、入口地址和符号，并用反汇编解释汇编伪指令实际生成的指令。
 
@@ -86,7 +91,7 @@ QEMU 的 `qemu` 目标通过 `-machine virt -nographic -bios default` 启用 vir
 | 关键符号 | `kern_entry=0x80200000`；`kern_init=0x8020000a`；`bootstack=0x80201000`；`bootstacktop=0x80203000`；`edata=end=0x80203008` |
 | 入口反汇编 | `la sp, bootstacktop` 展开为 `auipc` 和 `mv`；`tail kern_init` 跳转到 `0x8020000a` |
 
-ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU loader 使用的裸镜像。链接地址与 Makefile 的加载地址均为 `0x80200000`，两者一致。
+`edata` 和 `end` 相等，说明本次链接结果中 `[edata, end)` 长度为 0；`kern_init` 中的 `memset` 调用没有清除任何字节。ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU loader 使用的裸镜像。链接脚本的起始地址与 Makefile 的加载地址均为 `0x80200000`，两者一致。
 
 ![干净构建输出](./images/01-build-success.png)
 
@@ -100,7 +105,7 @@ ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU
 
 *图 03：`nm -n` 的关键符号地址——`kern_entry=0x80200000`、`kern_init=0x8020000a`、`bootstack=0x80201000`、`bootstacktop=0x80203000`、`edata=end=0x80203008`。*
 
-### 4.3 普通 QEMU 启动
+### 4.2 普通 QEMU 启动
 
 **目的：** 不连接 GDB，先确认默认 OpenSBI 固件和内核可以在 QEMU 中完成启动。
 
@@ -110,13 +115,11 @@ ELF 保留符号和调试信息，供 GDB 定位函数；`ucore.img` 是供 QEMU
 
 ![普通 QEMU 启动输出](./images/04-qemu-start.png)
 
-*图 04：OpenSBI v0.4 横幅与 QEMU virt 平台信息，含 `Firmware Base: 0x80000000`、`PMP0: 0x80000000-0x801fffff`（这正是内核地址 `0x80200000` 的由来），末尾为 ucore 的 `(THU.CST) os is loading ...`；退出码 124 与“无残留 QEMU 进程”也在画面内。*
-
-### 4.4 GDB 启动链与栈检查
+### 4.3 GDB 启动链与栈检查
 
 **目的：** 在运行时确认 reset ROM、OpenSBI、内核汇编入口及 C 初始化函数的地址顺序，并直接验证 `kern_entry` 设置的栈值。
 
-**方法：** `make debug` 启动 `-s -S` QEMU；GDB 脚本连接 `localhost:1234`，从复位地址单步五次，然后在 `kern_entry` 和 `kern_init` 设置符号断点。命令文件与完整输出保存在 `report/_work/logs/41-lab1-startup-trace.gdb`、`46-lab1-startup-trace.log`；最终复跑对应 `52` 至 `55` 号日志。
+**方法：** 终端 A 运行 `make debug`，终端 B 运行 `make gdb` 连接 `localhost:1234`。GDB 从复位地址单步五次，再在 `kern_entry` 和 `kern_init` 设置断点；在入口处逐条执行栈设置指令并检查 `sp`。最终复跑的命令和输出保存在 `report/_work/logs/52` 至 `55` 号文件中。
 
 | GDB 停点/动作 | 观测结果 | 解释 |
 |---|---|---|
@@ -140,19 +143,56 @@ GDB 脱离后让目标继续运行，QEMU 串口仍输出 ucore 启动信息。�
 
 ![kern_entry 栈切换](./images/07-gdb-kernel-entry.png)
 
-*图 07：命中 `kern_entry`（`PC=0x80200000`）时 `sp=0x8001bd80`（仍是固件栈），`&bootstacktop=0x80203000`；执行第一条指令 `auipc sp,0x3` 后 `sp=0x80203000`，与 `bootstacktop` 相等，断言成立。*
+*图 07：命中 `kern_entry`（`PC=0x80200000`）时 `sp=0x8001bd80`，`&bootstacktop=0x80203000`；执行第一条指令 `auipc sp,0x3` 后 `sp=0x80203000`，与 `bootstacktop` 相等，断言成立。*
 
 ![进入 kern_init](./images/08-gdb-kern-init.png)
 
 *图 08：继续后在 `kern_init` 命中，`PC=0x8020000a`，`sp` 仍为 `0x80203000`；继续运行后串口输出启动信息。*
 
+### 4.4 练习题
+
+#### 练习 1：理解内核启动中的程序入口操作
+
+`la sp, bootstacktop` 把符号 `bootstacktop` 的地址放入栈指针 `sp`。它取得的是地址本身，不是读取该地址处的内容。当前反汇编将它展开为 `auipc sp,0x3` 和 `mv sp,sp`；执行第一条后 `sp` 已为 `0x80203000`，第二条没有改变这个值。
+
+`entry.S` 在 `.data` 中通过 `.space KSTACKSIZE` 预留内核栈。`KSTACKSIZE` 为两页，即 `2 × 4096 = 8192` 字节；符号地址为 `bootstack=0x80201000`、`bootstacktop=0x80203000`。RISC-V 栈向低地址增长，所以入口把 `sp` 指向栈的高地址边界。这样进入 C 函数前就有了可用的内核栈，函数调用和局部变量才能正常使用栈空间。
+
+`tail kern_init` 是尾跳转伪指令，用来把控制流交给 `kern_init`。本次反汇编显示为跳到 `0x8020000a` 的 `j` 指令。它不像普通函数调用那样保存一个返回地址；`kern_init` 被声明为 `noreturn`，入口函数也不需要在初始化后恢复执行，因此直接跳转即可。
+
+#### 练习 2：使用 GDB 验证启动流程
+
+终端 A 用 `make debug` 启动带有 `-s -S` 的 QEMU，终端 B 用 `make gdb` 连接。GDB 初始读到 `PC=0x1000`，用 `x/5i $pc` 查看复位代码，再执行五次 `si`；PC 到达 `0x80000000`。随后在 `kern_entry` 设置断点并继续运行，确认 PC 到达 `0x80200000`，即执行内核第一条指令。实验中还继续单步检查栈设置，并在 `kern_init` 断点确认 C 入口地址。
+
+本次复位 ROM 的指令及作用如下：
+
+| 地址 | 指令 | 作用 |
+|---|---|---|
+| `0x1000` | `auipc t0,0x0` | 取得当前 PC 附近的地址基准，供后续访问复位数据。 |
+| `0x1004` | `addi a1,t0,32` | 将设备树数据地址 `0x1020` 放入 `a1`，作为启动参数。 |
+| `0x1008` | `csrr a0,mhartid` | 读取当前 hart ID，放入 `a0`。 |
+| `0x100c` | `ld t0,24(t0)` | 从 `0x1018` 读取下一阶段的入口地址。 |
+| `0x1010` | `jr t0` | 跳转到读取出的地址；本次运行到达 OpenSBI 的 `0x80000000`。 |
+
+GDB 的观察结果与启动顺序一致：`0x1000 → 0x80000000 → 0x80200000`。前五条指令属于本次 QEMU `virt` 机器提供的复位代码，负责准备启动参数并把控制权交给 OpenSBI；OpenSBI 初始化后再进入已由 QEMU loader 放在 `0x80200000` 的内核。`0x1000` 是当前模拟平台的复位入口，其他 RISC-V 实现可能使用不同地址。
+
 ### 4.5 AI 协作与迭代记录
 
-本次任务以 Starter Code 验证和实验报告整理为主，没有让 AI 实现课程功能，也没有修改课程源码。因此不存在可如实报告的代码生成迭代次数或功能实现提示词。`report/prompt.md` 保留了实际用户任务、目录约束与逐条追问，没有编造模型对话。逐步执行记录见 `report/_work/execution-log.md`（随仓库提交），每次环境诊断的原始输出保存在 `report/_work/logs/`（仅本地保留）。
+本次以 Starter Code 验证和报告整理为主，没有修改课程源码。实际使用过的提示词记录在 `report/prompt.md`；学习过程和实验步骤记录在 `report/_work/execution-log.md`。原始终端日志保存在 `report/_work/logs/`，不纳入提交。
 
-## 五、测试与验证
+## 五、实验知识点与操作系统原理
 
-下表"证据"列引用的是本次实验的原始日志文件名。完整日志保存在工作区 `report/_work/logs/`，属于过程记录、不纳入 Git 提交；报告正文保留了各项验证的结论与对应日志编号，便于本人复现时对照。
+| 本实验中的知识点 | 对应的操作系统原理 | 含义、联系和差异 |
+|---|---|---|
+| 复位入口、固件与内核交接 | 引导过程分阶段完成平台初始化和内核启动 | 本次从 QEMU `virt` 的 `0x1000` 复位代码进入 OpenSBI，再进入 ucore；`0x1000` 是当前模拟平台的地址，不能推广到所有 RISC-V 实现。 |
+| 链接脚本与加载地址 | 内核按链接时确定的内存布局运行，加载器负责把镜像放到对应位置 | 本次 `kernel.ld` 和 QEMU loader 都使用 `0x80200000`。由于没有启用分页，这里的运行地址与装载物理地址相同；启用分页后，虚拟地址和物理地址可以不同。 |
+| ELF 与裸镜像 | ELF 描述程序入口、段和符号，裸镜像只保留供装载的连续内容 | GDB 使用保留符号的 `bin/kernel`；QEMU loader 加载 `bin/ucore.img`。两者来自同一内核，服务于调试和运行的不同环节。 |
+| 栈指针与函数调用 | 内核进入 C 代码前需要建立符合调用约定的栈 | 栈是预留的内存区域，`sp` 是运行时指向栈顶的寄存器；本次入口把它设为 `0x80203000`，栈向低地址增长。 |
+| BSS 初始化 | 未初始化的全局/静态数据在启动时需要置零 | 代码调用 `memset(edata, 0, end - edata)`；本次 `edata=end`，长度为 0，所以虽然保留了初始化步骤，实际没有清零字节。 |
+| SBI 与控制台输出 | 内核通过固件接口请求底层服务 | `cprintf` 最终通过 `ecall` 请求 OpenSBI 输出字符。SBI 是内核与固件之间的接口，和用户程序通过系统调用请求内核服务处在不同层次。 |
+
+## 六、测试与验证
+
+下表"证据"列引用的是本次实验的原始日志文件名。完整日志保存在工作区 `report/_work/logs/`，属于过程记录。
 
 | 验证项目 | 结果 | 证据 |
 |---|---|---|
@@ -164,9 +204,9 @@ GDB 脱离后让目标继续运行，QEMU 串口仍输出 ucore 启动信息。�
 
 ### 实验截图
 
-`report/images/` 中保存了 8 张真实终端截图，按实验顺序编号，全部为实际终端/调试器画面，未使用日志文本伪造。
+`report/images/` 中保存了 8 张真实终端截图，按实验顺序编号，全部为实际终端/调试器画面。
 
-命名约定：统一使用**两位数字前缀 + 语义名**，本报告只引用下表列出的文件，图片路径写作 `./images/<文件名>`。
+命名约定：统一使用**两位数字前缀 + 语义名**。
 
 | 文件名 | 截图内容 | 对应小节 |
 |---|---|---|
@@ -179,17 +219,12 @@ GDB 脱离后让目标继续运行，QEMU 串口仍输出 ucore 启动信息。�
 | `07-gdb-kernel-entry.png` | `kern_entry`、`sp` 切换为 `bootstacktop=0x80203000` | 4.4 |
 | `08-gdb-kern-init.png` | 命中 `kern_init`，`PC=0x8020000a` | 4.4 |
 
-## 六、实验总结与收获
+## 七、实验总结与收获
 
 ### 对操作系统启动过程的理解
 
-1. 固件入口和内核入口是两个不同阶段：QEMU 首先从 `0x1000` 的 reset ROM 开始，然后到 OpenSBI 的 `0x80000000`，再由固件跳入加载在 `0x80200000` 的 ucore。
+1. 固件入口和内核入口是两个不同阶段：本次 QEMU 从 `0x1000` 的复位代码开始，然后到 OpenSBI 的 `0x80000000`，再跳入加载在 `0x80200000` 的 ucore。
 2. 内核入口汇编先建立自己的栈，再进入 C 函数。若过早使用 C 运行时而没有有效栈，函数调用和局部状态都无法可靠工作。本次 GDB 直接观察到 `sp` 从 OpenSBI 地址变为 `bootstacktop`。
-3. ELF 和裸镜像用途不同：ELF 用于保留入口、符号及调试信息；QEMU 的 loader 加载 raw `ucore.img`。链接脚本与 QEMU 加载地址必须一致。
-4. 本次 Lab1 Starter Code 只验证最初启动和串口输出，不涵盖中断初始化、内存管理、进程调度等后续 OS 原理内容；不能把这次最小启动结果等同于完整操作系统功能。
+3. ELF 和裸镜像用途不同：ELF 保留入口、符号及调试信息，QEMU loader 加载 raw `ucore.img`。链接脚本与加载地址需要匹配。
+4. 内核通过 SBI 请求 OpenSBI 输出字符。本次只验证了启动和控制台输出，没有实现完整操作系统的中断、内存管理或进程调度。
 
-### AI 协作开发的经验
-
-把任务路径、可修改目录和逐节提交要求明确给出后，实验记录可以直接对应到报告。记录命令时应写清目的、退出码和关键输出；例如普通 QEMU 因无限循环返回 124 是有上下文的预期结果。调试器连接失败时，区分本机 socket 权限与外网问题；后台 shell 里显式核对 PATH，可以避免把环境问题误判为源码问题。AI 生成的结论仍应由 ELF、串口输出和 GDB 寄存器观察支撑。
-
-本次各实验小节的记录已按要求分别提交。最终课程源码无改动，构建产物和 QEMU 调试资源均已清理。逐节提交记录见仓库 Git 历史。
