@@ -69,6 +69,20 @@ GDB 通过 `localhost:1234` 连接 QEMU。
 
 
 
+### 复现环境的启动参数适配（2026-10-10）
+
+在本机 QEMU 8.2.2、默认 OpenSBI v1.3 环境中，原 `make qemu` 能显示 OpenSBI 横幅，但没有输出 `(THU.CST) os is loading ...`。原参数 `-device loader,file=$(UCOREIMG),addr=0x80200000` 将镜像放到内存中，却没有向当前固件启动流程提供内核入口；实测 OpenSBI 显示 `Domain0 Next Address : 0x0`，与内核入口 `0x80200000` 不符。
+
+旧环境能够使用该参数，是因为 QEMU 4.1.1 默认选择 `fw_jump` 固件，而 OpenSBI v0.4 的 64 位 QEMU virt 配置预设 `FW_JUMP_ADDR=0x80200000`。当前 QEMU 8.2.2 的启动实现通过动态启动信息向 OpenSBI 传递下一阶段地址：内核入口初值为零，使用 `-kernel` 加载内核后才会在本次启动配置中更新。因此，问题涉及默认固件类型和入口传递方式，不能仅归因于 OpenSBI 版本号；
+
+最小修改仅涉及 `code/Makefile` 的 `qemu` 和 `debug` 两个目标，将镜像加载参数替换为：
+
+```makefile
+-kernel $(UCOREIMG)
+```
+
+`debug` 保留原有 `-s -S`，其加载参数后的续行符也保留。没有修改内核代码、重编译镜像或安装软件包。
+
 ## 三、实验整体逻辑分析
 
 本实验追踪的是从 QEMU 上电到 ucore C 初始化函数的控制流：
