@@ -27,6 +27,8 @@
 
 ## 二、实验环境
 
+### 首次运行环境
+
 | 项目 | 实际环境 |
 |---|---|
 | 主机环境 | Ubuntu 22.04.5 LTS，运行于 WSL2；x86_64，16 个可用处理器 |
@@ -39,6 +41,33 @@
 | AI 工具 | Codex、Claude Code（deepseek-flash） |
 
 GDB 通过 `localhost:1234` 连接 QEMU。
+
+### 复现环境
+
+| 项目 | 实际环境 |
+|---|---|
+| 主机环境 | Ubuntu 24.04.5.1 LTS，运行于 Vmware Workstation；x86_64，1 个可用处理器 |
+| GNU Make | 4.3 |
+| RISC-V GCC | `riscv64-unknown-elf-gcc` 13.2.0 |
+| RISC-V GDB | 使用更新的 `gdb-multiarch` 15.1 软连接为 `riscv64-unknown-elf-gdb` |
+| QEMU | `qemu-system-riscv64` 8.2.2 |
+| 工具安装位置 | 所有工具直接使用 `apt` 安装，均为默认安装位置 |
+| 实验代码目录 | `Operation-System-Labs/code/` |
+| AI 工具 | Codex |
+
+> 安装工具原始命令
+> ```bash
+> sudo apt update
+> sudo apt install build-essential git \
+>   gcc-riscv64-unknown-elf binutils-riscv64-unknown-elf \
+>   qemu-system-misc gdb-multiarch
+> ```
+> 软连接 gdb-multiarch 为 riscv64-unknown-elf-gdb
+> ```bash
+> sudo ln -s /usr/bin/gdb-multiarch /usr/local/bin/riscv64-unknown-elf-gdb
+> ```
+
+
 
 ## 三、实验整体逻辑分析
 
