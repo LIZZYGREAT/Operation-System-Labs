@@ -204,6 +204,24 @@ int another_function(int arg);
 
 ![测试结果截图](./images/test_result.png)
 
+### 验证初始化函数
+
+在lab2代码的修改之前，运行 `make qemu`，可以编译过程中有报错，如下图所示：
+
+![基线截图](./images/baseline.png)
+
+从中可见是基线代码中 best-fit 模块未实现导致。
+
+在添加完初始化函数，并且补全了 best-fit 模块后，运行 `make qemu`，如下图所示：
+
+![初始化编译截图](./images/init.png)
+
+此时可以成功编译。
+
+此时运行本次实验提供的测试脚本 `make grade`，可以看到初始函数的验证通过，截图如下：
+
+![初始化验证截图](./images/init_check.png)
+
 ---
 
 ## 六、实验总结与收获
