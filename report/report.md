@@ -157,7 +157,7 @@ flowchart TD
 
 ##### 第二次迭代：B2 接入与运行验收
 
-default First-Fit 基线构建和启动自检通过后，只在 `pmm.c` 的 `init_pmm_manager()` 将管理器指针改为 `best_fit_pmm_manager`，保留既有初始化和打印逻辑。此次审阅时，Best-Fit 实现已在 HEAD 中；B2 注册切换是 `pmm.c` 的一行工作区改动，尚未提交。
+default First-Fit 基线构建和启动自检通过后，`pmm.c` 的 `init_pmm_manager()` 已将管理器指针切换为 `best_fit_pmm_manager`，并保留既有初始化和打印逻辑。该注册切换已随提交 `585b259`（`feat(lab2): integrate and document Best-Fit allocator`）进入当前分支历史。Best-Fit 构建、QEMU 自检和自动评分结果见下方 B2 验收记录。
 
 ### 练习：[练习标题]
 
@@ -204,6 +204,14 @@ default First-Fit 基线构建和启动自检通过后，只在 `pmm.c` 的 `ini
 
 ### B2：构建、启动与自动评分
 
+从仓库根目录运行 Best-Fit 构建、启动自检和自动评分：
+
+```sh
+make -C code
+timeout --foreground --signal=INT --kill-after=2s 8s make -C code qemu
+make -C code grade
+```
+
 | 阶段 | 运行命令/方式 | 关键输出与结果 |
 |------|----------|----------------|
 | default First-Fit 基线 | `make`；`timeout --foreground --signal=INT --kill-after=2s 6s make qemu` | `make` 退出 0。QEMU 输出 `memory management: default_pmm_manager`、空闲页区间及 `check_alloc_page() succeeded!`。QEMU 以 124 结束，是内核进入空闲循环后由超时安全停止。 |
@@ -211,7 +219,15 @@ default First-Fit 基线构建和启动自检通过后，只在 `pmm.c` 的 `ini
 | 自动评分 | `make grade` | 退出 0；评分输出两项 `OK`，并以 `Total Score: 20/20` 结束。 |
 | 显示评分串口行 | 在临时副本运行 `tools/inject.py` 和 `make`，再启动 QEMU 并将串口输出接到标准输出；完整 shell 命令和临时路径未留存 | 实际输出 `[Test 1] Page Init: PASS`、`[Test 2] Best-Fit: PASS`。有界 QEMU 退出码 124，停止原因同上。 |
 
-`make grade` 将评分用副本和串口文件放在 `/tmp/lab2_grade`，评分后清理该目录；因此它的终端显示 `OK`，不直接显示串口 PASS 行。评分脚本用这两条精确字符串进行检查；PASS 行另由上表的临时副本串口运行核对。当前报告记录的是关键输出，没有附加并不存在的截图文件。
+QEMU 启动截图显示内核已选择 best_fit_pmm_manager，物理页初始化完成，且 check_alloc_page() 自检通过。
+
+![Best-Fit QEMU 启动与固定自检结果](./figure/best_fit_qemu_check.png)
+
+自动评分截图显示 Page Init 与 Best-Fit 检查均为 OK，总分为 20/20。
+
+![Best-Fit make grade 自动评分结果](./figure/best_fit_grade.png)
+
+`make grade` 将评分用副本和串口文件放在 `/tmp/lab2_grade`，评分后清理该目录；因此它的终端显示 `OK`，不直接显示串口 PASS 行。评分脚本用这两条精确字符串进行检查；PASS 行另由上表的临时副本串口运行核对。两张截图分别位于 `report/figure/best_fit_qemu_check.png` 和 `report/figure/best_fit_grade.png`。
 
 ### 阶段性问题与未覆盖边界
 
