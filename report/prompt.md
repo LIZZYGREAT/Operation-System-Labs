@@ -293,3 +293,139 @@ Requirements：
 - 以临时独立 harness 编译实际 `best_fit_pmm.c` 并调用原有 `best_fit_pmm_manager.check()`；固定检查及最优块选择/同尺寸低地址优先、精确匹配、地址排序、拆分、左右/双侧合并、碎片化失败、超总量失败、空链表但计数未清零、重复分配释放恢复均通过。harness 首次运行的手写总页数期望值有误，修正测试期望后重编重跑通过，生产代码没有因此修改。
 - `make -j2` 因 `kern/mm/pmm.c:77` 调用未声明的 `page_init()` 且 `-Werror` 而失败；这是 A 任务尚未完成导致的完整构建阻塞。本轮未修改 `pmm.c`、未切换 B2、未修复 Best-Fit 代码。随后 `make clean` 清除了本轮生成的 `code/obj`。
 - 当前可独立交付 B1 源码审查结果；尚未完成依赖 `page_init()` 的全项目链接、QEMU 启动及集成验收。
+
+## Buddy System：C 线实现用 Prompt 与实际记录
+
+### 2026-10-21：C 线 Buddy 实现、内核接入与 QEMU 4.1.1 验证
+
+**用户请求与确认**
+
+> 好，那现在按照这份提示词完成 Buddy System 的实现和接入，第二份测试提示词等实现完成后再说。
+
+本人学号由用户明确提供为 `2412712`。
+
+> 那你先按照指导书帮我安装 QEMU 4.1.1，再用这个版本继续验证 Buddy，之前新增的兼容辅助文件也删掉。
+
+**执行与修正记录**
+
+- 在个人分支 `work/lab2/ziqiu/buddy` 实现 `buddy_pmm.c`、`buddy_pmm.h`；仅在 `pmm.c` 增加管理器选择，在 Makefile 增加 `PMM` 参数。保留 A 的初始化、公共结构体、B 的分配器与固定测试、启动代码和评分脚本。
+- 使用按阶空闲链表与绝对物理页号的 XOR 伙伴计算；申请向上取整到二次幂，首页记录原始请求，释放按实际占用归还。新增实现与接入代码标注本人学号。
+- 初次验证误用了默认 QEMU 7.0.0，启动出现分页后的取指异常，曾借助临时 GDB 文件排错。用户纠正后停止将该环境作为正式验证依据；已删除全部兼容辅助文件及旧日志。
+- 从指导书指定地址获取官方 QEMU 4.1.1 源码，在 WSL 用户目录编译安装，启用调试信息；使用实际输出为 4.1.1 的模拟器和原启动命令重新验证。
+- Buddy 编译、启动与基础自检通过，空闲页数恢复为 31929；First-Fit、Best-Fit 的原有启动自检均通过，非法 PMM 参数被拒绝。验证后恢复基线默认 First-Fit 构建。未修改 Buddy 算法来迎合测试。
+- 运行说明及命令见 `buddy_usage.md`，原始输出见三个 `*_qemu_4.1.1.log`。基础评分、完整独立测试与组员复现未执行；第二份测试提示词尚未编写。没有提交或推送。
+
+**实际采用的第一份提示词原文**
+
+下文保留提示词编写时的原文；其中“当前尚未执行”描述的是编写当时状态，实际执行结果以上方记录为准。
+# Lab2：Buddy System 实现提示词
+
+依据 `report/prompt.md` 模板编写。本提示词用于实现与接入，独立测试提示词后续另写；当前尚未执行。
+
+## [PROMPT]
+
+任务：参考现有 ucore 框架，从零实现 Buddy System 物理页分配器并接入内核。
+
+仓库：`A:/OS/exp/Operation-System-Labs`。以下代码路径相对于 `code/`。
+
+- 新建 `kern/mm/buddy_pmm.c`：实现分配器、管理器注册和基础自检。
+- 新建 `kern/mm/buddy_pmm.h`：声明管理器，说明分配与释放约定。
+- 最小修改 `kern/mm/pmm.c` 和 `Makefile`：支持通过 `PMM=buddy` 选择 Buddy，并支持 `first_fit`、`best_fit`，保留当前默认选择。
+- 新建仓库内 `report/buddy_usage.md`：记录设计、切换步骤和验证结果。
+
+操作要求：先阅读实际源码，遵循仓库分支规范，在项目中修改真实文件；保留其他成员代码，不改 `page_init()`、公共结构体、已有分配器及固定测试。使用模块私有静态结构，不依赖动态内存分配。本次只考虑单 hart 串行调用。
+
+保留 `lab2` 注释，新增贡献注释使用本人真实学号；学号未提供时向用户询问，不编造。不自动提交或推送。
+
+输出要求：说明修改文件、核心设计和实际验证结果；未运行或被环境阻塞的项目如实注明。实际执行后将提示词和修正过程补入仓库 `report/prompt.md` 的 Buddy 小节。
+
+## [RELY]
+
+先阅读 `kern/mm/pmm.h`、`pmm.c`、`memlayout.h`、`mmu.h`、`default_pmm.c`、`libs/list.h`、`libs/defs.h` 和构建规则，以真实定义为准。
+
+可依赖 `struct Page`、`struct pmm_manager`、页面状态宏、链表操作、`page2ppn()`、`pa2page()`、`assert()`、`cprintf()` 等已有资源。
+
+- `pages[0]` 对应物理页号 `nbase`，描述符覆盖 `[nbase, npage)`；`npage` 是页号上界，描述符数量为 `npage - nbase`。
+- 调用顺序为 `init_pmm_manager()` → `page_init()` → `check_alloc_page()`；`page_init()` 会将可用页面通过 `init_memmap(base, n)` 交给管理器。
+- 管理器的 `init()` 执行时 `pages`、`npage` 尚未建立，只能初始化自身状态；阶数组容量根据框架支持范围确定。
+
+## [GUARANTEE]
+
+在 `buddy_pmm.c` 中实现并注册以下接口：
+
+```c
+static void buddy_init(void);
+static void buddy_init_memmap(struct Page *base, size_t n);
+static struct Page *buddy_alloc_pages(size_t n);
+static void buddy_free_pages(struct Page *base, size_t n);
+static size_t buddy_nr_free_pages(void);
+static void buddy_check(void);
+
+const struct pmm_manager buddy_pmm_manager;
+```
+
+在 `buddy_pmm.h` 中声明 `extern const struct pmm_manager buddy_pmm_manager;`。管理器名称为 `"buddy_pmm_manager"`，六个回调均指向对应实现。允许增加私有辅助函数。
+
+## [SPECIFICATION]
+
+### 统一约定
+
+1. 每个阶维护一个空闲链表，阶 `k` 的块含 \(2^k\) 页，首页物理页号按块大小对齐；另维护总空闲页数。
+2. 请求 `n` 页时向上取整到最小的二次幂，实际占用整个块；释放时传回原始请求 `n`。例如申请 3 页实际占用 4 页，`free_pages(p, 3)` 归还全部 4 页，计数按 4 页变化。不支持部分释放。
+3. 伙伴按绝对物理页号计算：`q = page2ppn(p)`，伙伴页号为 `q ^ ((size_t)1 << k)`。仅同阶、合法范围内、确认为空闲块首页的真正伙伴可以合并；访问其描述符前先检查范围。
+4. 空闲块首页设置 `PageProperty`，`property` 记录块页数；已分配首页清除此标记，`property` 记录原始请求长度，并用模块私有且未被占用的 `flags` 位标识已分配首页。内部页清除旧首页标记，`property` 为 0；保留位含义不变。
+5. 一个节点只能属于一个链表；拆分和合并正确摘链、更新标记。所有已登记页既不丢失也不重复管理，保留页不进入空闲区，空闲计数等于各阶空闲块页数之和。
+6. 零长度、越界、重复登记、重复释放、内部页释放和错误释放长度，通过断言或 `panic()` 报告，检查先于状态修改。地址、取整和移位运算防止越界与溢出。
+
+### buddy_init
+
+Pre-Condition：启动时尚未登记页面。
+
+Post-Condition：初始化各阶空闲链表，总空闲页数为 0；不访问尚未建立的描述符数组。
+
+### buddy_init_memmap
+
+Pre-Condition：管理器及描述符数组已初始化，`n > 0`，区间合法且尚未登记，传入页均为保留状态。
+
+Post-Condition：清除传入页的保留标记、初始化引用计数等元数据，将整个区间组织为符合对齐的二次幂空闲块，空闲页数增加 `n`。
+
+Case：起点不满足大块对齐或长度不是二次幂时，分成多个合法块覆盖全部页面，不浪费页、不扩大区间。支持多次登记不重叠区间，合并合法伙伴，不能跨保留间隙。
+
+### buddy_alloc_pages
+
+Pre-Condition：管理器已初始化，`n > 0`。
+
+Post-Condition：成功返回实际分配块首页的 `Page *`，记录原始请求，空闲页数减少实际占用；失败返回 `NULL` 且状态不变。
+
+Case 1：目标阶有空闲块，直接取出；没有时从最近的可用高阶逐级拆分，将剩余半块放回相应阶。
+
+Case 2：总量不足、没有合适连续块，或请求超出支持范围、取整会溢出，返回 `NULL`。已分配块互不重叠，取整余量不能再次分配。
+
+### buddy_free_pages
+
+Pre-Condition：`base` 是尚未释放的分配块首页，`n` 与原始请求长度相同。
+
+Post-Condition：归还整个实际分配块，与同阶空闲伙伴逐级合并；每次选择低地址为新首页，清除旧标记。
+
+Requirements：检查指针范围和元素对齐后再访问描述符。空闲页数只增加本次归还的实际页数，合并不重复增加；伙伴不满足条件或到达最大阶时停止。
+
+### buddy_nr_free_pages
+
+Pre-Condition：管理器已初始化。
+
+Post-Condition：返回所有阶的空闲页总数，不修改状态，不把块数量或分配块内部碎片计为空闲页。
+
+### buddy_check
+
+Pre-Condition：页面登记已完成，由现有 `check_alloc_page()` 调用。
+
+Post-Condition：用真实断言检查单页与非二次幂分配、实际计数、不重叠及释放后复用；回收全部自检资源，恢复原空闲页数和合法状态。资源不足时明确说明未执行用例。
+
+Requirements：不能留空、借用其他分配器检查或只打印成功。完整独立测试后续另写。
+
+### 接入与验证
+
+- 在 `init_pmm_manager()` 中通过编译宏选择管理器，保留原初始化流程；`Makefile` 将 `PMM` 参数传给编译器，拒绝非法选项，复用已有源码收集规则。
+- 在实际实验环境中执行 `make clean`、`make PMM=buddy`、`make qemu PMM=buddy`，检查真实管理器名称及自检输出；切换后端须干净构建，演示后恢复原默认配置。
+- 提供 Best-Fit 的切换与基础评分步骤，最终小组默认后端仍应为 Best-Fit。基础评分中的 Best-Fit 选择检查不能用于判定 Buddy 正确性；不改评分脚本、不新增 `kern/test`。
+- 记录实际运行结果及限制，保留原有测试；基础自检通过后仍需独立测试与另一位成员复现。

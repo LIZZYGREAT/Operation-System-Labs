@@ -34,6 +34,15 @@ CFLAGS  := -mcmodel=medany -std=gnu99 -Wno-unused -Werror
 CFLAGS	+= -fno-builtin -Wall -O2 -nostdinc $(DEFS)
 CFLAGS	+= -fno-stack-protector -ffunction-sections -fdata-sections
 CFLAGS	+= -g
+# lab2 allocator selection - 2412712. Clean before changing PMM.
+PMM ?= first_fit
+ifeq ($(PMM),buddy)
+CFLAGS += -DPMM_USE_BUDDY
+else ifeq ($(PMM),best_fit)
+CFLAGS += -DPMM_USE_BEST_FIT
+else ifneq ($(PMM),first_fit)
+$(error Invalid PMM '$(PMM)': use first_fit, best_fit, or buddy)
+endif
 CFLAGS2 = $(CFLAGS) -D ucore_test
 CTYPE	:= c S
 LD      := $(GCCPREFIX)ld
