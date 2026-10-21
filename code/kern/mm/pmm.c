@@ -2,6 +2,10 @@
 #include <best_fit_pmm.h>
 // lab2 Buddy integration - 2412712
 #include <buddy_pmm.h>
+// lab2 optional independent tests - 2412712
+#ifdef BUDDY_TEST
+#include <buddy_test.h>
+#endif
 #include <defs.h>
 #include <error.h>
 #include <memlayout.h>
@@ -141,6 +145,11 @@ void pmm_init(void) {
     // Then pmm can alloc/free the physical memory.
     // Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
     init_pmm_manager();
+
+    // lab2 - 2412712: isolate tests before registering any real free pages.
+#ifdef BUDDY_TEST
+    buddy_test_all();
+#endif
 
     // detect physical memory space, reserve already used memory,
     // then use pmm->init_memmap to create free page list

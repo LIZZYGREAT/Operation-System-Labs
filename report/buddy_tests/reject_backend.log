@@ -1,0 +1,1 @@
+Makefile:57: *** BUDDY_TEST=1 requires PMM=buddy.  Stop.
