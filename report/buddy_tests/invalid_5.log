@@ -30,7 +30,7 @@ DTB init completed
 (THU.CST) os is loading ...
 Special kernel symbols:
   entry  0xffffffffc02000d6 (virtual)
-  etext  0xffffffffc020238e (virtual)
+  etext  0xffffffffc020230e (virtual)
   edata  0xffffffffc0207018 (virtual)
   end    0xffffffffc02080c0 (virtual)
 Kernel executable memory footprint: 32KB

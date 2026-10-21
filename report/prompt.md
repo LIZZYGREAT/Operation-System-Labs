@@ -272,7 +272,7 @@ Requirements：
 - 记录源码现状与注释差异：`pmm.c` 调用了 `page_init()`，但所查代码中没有它的定义；`pmm.c` 注释称 first-fit/best-fit/worst-fit/buddy 都可用，但当前内核代码只定义了 `default_pmm_manager`，Best-Fit 仅有声明和测试框架，未见 worst-fit 或 buddy 注册实现。`tools/test_lab2.c` 的 Best-Fit 外部测试只检查管理器指针，具体算法行为由 `best_fit_check()` 覆盖。
 - 本轮只阅读、搜索并整理，没有修改实验代码，没有提交，也没有运行构建或测试。
 
-## 实现用 Prompt
+### 实现用 Prompt
 
 （后续实际使用 AI 生成或修改代码时，在此按任务记录 Spec、Prompt 原文、输出问题和修正过程。）
 
@@ -294,35 +294,12 @@ Requirements：
 - `make -j2` 因 `kern/mm/pmm.c:77` 调用未声明的 `page_init()` 且 `-Werror` 而失败；这是 A 任务尚未完成导致的完整构建阻塞。本轮未修改 `pmm.c`、未切换 B2、未修复 Best-Fit 代码。随后 `make clean` 清除了本轮生成的 `code/obj`。
 - 当前可独立交付 B1 源码审查结果；尚未完成依赖 `page_init()` 的全项目链接、QEMU 启动及集成验收。
 
-## Buddy System：C 线实现用 Prompt 与实际记录
 
-### 2026-10-21：C 线 Buddy 实现、内核接入与 QEMU 4.1.1 验证
+### 任务三：Buddy System（伙伴系统）
 
-**用户请求与确认**
+#### 第一份提示词：Buddy 实现与接入
 
-> 好，那现在按照这份提示词完成 Buddy System 的实现和接入，第二份测试提示词等实现完成后再说。
-
-本人学号由用户明确提供为 `2412712`。
-
-> 那你先按照指导书帮我安装 QEMU 4.1.1，再用这个版本继续验证 Buddy，之前新增的兼容辅助文件也删掉。
-
-**执行与修正记录**
-
-- 在个人分支 `work/lab2/ziqiu/buddy` 实现 `buddy_pmm.c`、`buddy_pmm.h`；仅在 `pmm.c` 增加管理器选择，在 Makefile 增加 `PMM` 参数。保留 A 的初始化、公共结构体、B 的分配器与固定测试、启动代码和评分脚本。
-- 使用按阶空闲链表与绝对物理页号的 XOR 伙伴计算；申请向上取整到二次幂，首页记录原始请求，释放按实际占用归还。新增实现与接入代码标注本人学号。
-- 初次验证误用了默认 QEMU 7.0.0，启动出现分页后的取指异常，曾借助临时 GDB 文件排错。用户纠正后停止将该环境作为正式验证依据；已删除全部兼容辅助文件及旧日志。
-- 从指导书指定地址获取官方 QEMU 4.1.1 源码，在 WSL 用户目录编译安装，启用调试信息；使用实际输出为 4.1.1 的模拟器和原启动命令重新验证。
-- Buddy 编译、启动与基础自检通过，空闲页数恢复为 31929；First-Fit、Best-Fit 的原有启动自检均通过，非法 PMM 参数被拒绝。验证后恢复基线默认 First-Fit 构建。未修改 Buddy 算法来迎合测试。
-- 运行说明及命令见 `buddy_usage.md`，原始输出见三个 `*_qemu_4.1.1.log`。基础评分、完整独立测试与组员复现未执行；第二份测试提示词尚未编写。没有提交或推送。
-
-**实际采用的第一份提示词原文**
-
-下文保留提示词编写时的原文；其中“当前尚未执行”描述的是编写当时状态，实际执行结果以上方记录为准。
-# Lab2：Buddy System 实现提示词
-
-依据 `report/prompt.md` 模板编写。本提示词用于实现与接入，独立测试提示词后续另写；当前尚未执行。
-
-## [PROMPT]
+##### [PROMPT]
 
 任务：参考现有 ucore 框架，从零实现 Buddy System 物理页分配器并接入内核。
 
@@ -339,7 +316,7 @@ Requirements：
 
 输出要求：说明修改文件、核心设计和实际验证结果；未运行或被环境阻塞的项目如实注明。实际执行后将提示词和修正过程补入仓库 `report/prompt.md` 的 Buddy 小节。
 
-## [RELY]
+##### [RELY]
 
 先阅读 `kern/mm/pmm.h`、`pmm.c`、`memlayout.h`、`mmu.h`、`default_pmm.c`、`libs/list.h`、`libs/defs.h` 和构建规则，以真实定义为准。
 
@@ -349,7 +326,7 @@ Requirements：
 - 调用顺序为 `init_pmm_manager()` → `page_init()` → `check_alloc_page()`；`page_init()` 会将可用页面通过 `init_memmap(base, n)` 交给管理器。
 - 管理器的 `init()` 执行时 `pages`、`npage` 尚未建立，只能初始化自身状态；阶数组容量根据框架支持范围确定。
 
-## [GUARANTEE]
+##### [GUARANTEE]
 
 在 `buddy_pmm.c` 中实现并注册以下接口：
 
@@ -366,9 +343,9 @@ const struct pmm_manager buddy_pmm_manager;
 
 在 `buddy_pmm.h` 中声明 `extern const struct pmm_manager buddy_pmm_manager;`。管理器名称为 `"buddy_pmm_manager"`，六个回调均指向对应实现。允许增加私有辅助函数。
 
-## [SPECIFICATION]
+##### [SPECIFICATION]
 
-### 统一约定
+###### 统一约定
 
 1. 每个阶维护一个空闲链表，阶 `k` 的块含 \(2^k\) 页，首页物理页号按块大小对齐；另维护总空闲页数。
 2. 请求 `n` 页时向上取整到最小的二次幂，实际占用整个块；释放时传回原始请求 `n`。例如申请 3 页实际占用 4 页，`free_pages(p, 3)` 归还全部 4 页，计数按 4 页变化。不支持部分释放。
@@ -377,13 +354,13 @@ const struct pmm_manager buddy_pmm_manager;
 5. 一个节点只能属于一个链表；拆分和合并正确摘链、更新标记。所有已登记页既不丢失也不重复管理，保留页不进入空闲区，空闲计数等于各阶空闲块页数之和。
 6. 零长度、越界、重复登记、重复释放、内部页释放和错误释放长度，通过断言或 `panic()` 报告，检查先于状态修改。地址、取整和移位运算防止越界与溢出。
 
-### buddy_init
+###### buddy_init
 
 Pre-Condition：启动时尚未登记页面。
 
 Post-Condition：初始化各阶空闲链表，总空闲页数为 0；不访问尚未建立的描述符数组。
 
-### buddy_init_memmap
+###### buddy_init_memmap
 
 Pre-Condition：管理器及描述符数组已初始化，`n > 0`，区间合法且尚未登记，传入页均为保留状态。
 
@@ -391,7 +368,7 @@ Post-Condition：清除传入页的保留标记、初始化引用计数等元数
 
 Case：起点不满足大块对齐或长度不是二次幂时，分成多个合法块覆盖全部页面，不浪费页、不扩大区间。支持多次登记不重叠区间，合并合法伙伴，不能跨保留间隙。
 
-### buddy_alloc_pages
+###### buddy_alloc_pages
 
 Pre-Condition：管理器已初始化，`n > 0`。
 
@@ -401,7 +378,7 @@ Case 1：目标阶有空闲块，直接取出；没有时从最近的可用高�
 
 Case 2：总量不足、没有合适连续块，或请求超出支持范围、取整会溢出，返回 `NULL`。已分配块互不重叠，取整余量不能再次分配。
 
-### buddy_free_pages
+###### buddy_free_pages
 
 Pre-Condition：`base` 是尚未释放的分配块首页，`n` 与原始请求长度相同。
 
@@ -409,13 +386,13 @@ Post-Condition：归还整个实际分配块，与同阶空闲伙伴逐级合并
 
 Requirements：检查指针范围和元素对齐后再访问描述符。空闲页数只增加本次归还的实际页数，合并不重复增加；伙伴不满足条件或到达最大阶时停止。
 
-### buddy_nr_free_pages
+###### buddy_nr_free_pages
 
 Pre-Condition：管理器已初始化。
 
 Post-Condition：返回所有阶的空闲页总数，不修改状态，不把块数量或分配块内部碎片计为空闲页。
 
-### buddy_check
+###### buddy_check
 
 Pre-Condition：页面登记已完成，由现有 `check_alloc_page()` 调用。
 
@@ -423,34 +400,16 @@ Post-Condition：用真实断言检查单页与非二次幂分配、实际计数
 
 Requirements：不能留空、借用其他分配器检查或只打印成功。完整独立测试后续另写。
 
-### 接入与验证
+###### 接入与验证
 
 - 在 `init_pmm_manager()` 中通过编译宏选择管理器，保留原初始化流程；`Makefile` 将 `PMM` 参数传给编译器，拒绝非法选项，复用已有源码收集规则。
 - 在实际实验环境中执行 `make clean`、`make PMM=buddy`、`make qemu PMM=buddy`，检查真实管理器名称及自检输出；切换后端须干净构建，演示后恢复原默认配置。
 - 提供 Best-Fit 的切换与基础评分步骤，最终小组默认后端仍应为 Best-Fit。基础评分中的 Best-Fit 选择检查不能用于判定 Buddy 正确性；不改评分脚本、不新增 `kern/test`。
 - 记录实际运行结果及限制，保留原有测试；基础自检通过后仍需独立测试与另一位成员复现。
 
-### 2026-10-21：执行第二份 Buddy 测试提示词
+#### 第二份提示词：Buddy 独立测试
 
-**用户原始提示**
-
-> 现在按照第二份提示词完成 Buddy 的测试代码，用 QEMU 4.1.1 运行验证，记录结果。
-
-**执行与验证记录**
-
-- 在 `work/lab2/ziqiu/buddy` 分支新增 `buddy_test.c`、`buddy_test.h`，在真实 `page_init()` 前使用 64 个静态描述符建立受控状态；仅操作管理元数据，不访问其页号指向的真实物理内存。用独立逐页归属表核验计数、区间、标记和回收。
-- Makefile 新增默认关闭的 `BUDDY_TEST` 和 `BUDDY_TEST_CASE`；`pmm.c` 仅增加条件头文件和测试调用。新增 `tools/run_buddy_tests.sh` 自动干净构建、校验 QEMU 4.1.1 版本并核对实际日志。
-- 八个正常场景全部通过，包括 13 页非对齐登记、分离区域与保留间隙、伙伴/非伙伴区分、逐级合并、非二次幂请求、碎片化失败与 16 轮混合分配释放。正常测试恢复全局状态后，原内核继续初始化真实内存，空闲页数为 31926，原 Buddy 自检通过。测试代码增大镜像，关闭测试后为 31929 页。
-- 六次独立启动分别验证零长度申请、重复释放、申请 3 页按 4 页释放、内部页释放、重复登记和越界登记。均匹配到指定用例标识及真实 `buddy_pmm.c` 对应断言；未将超时或任意崩溃当作通过。
-- 测试关闭后的 Buddy、Best-Fit、默认 First-Fit 启动自检通过；四个非法构建配置被拒绝。最终恢复默认 First-Fit 构建。实际环境日志记录 QEMU 4.1.1、OpenSBI 0.4、RISC-V GCC 14.2.0。
-- 本轮测试代码和脚本首次运行通过，未发现需修复的算法错误；没有修改 Buddy 算法、其他分配器、公共结构体、启动代码或评分测试。结果、覆盖理由及命令补入 `buddy_usage.md`，实际输出在 `buddy_tests/`。
-- 未运行基础评分或组员交叉复现，未提交或推送。
-
-**实际使用的第二份提示词原文**
-# Lab2：Buddy System 测试提示词（第二份）
-
-
-## [PROMPT]
+##### [PROMPT]
 
 任务：阅读现有 Buddy 实现，设计并实现独立测试函数，验证页面登记、分配、拆分、释放、合并和边界行为，并说明各用例为什么能够发现错误。
 
@@ -464,7 +423,7 @@ Requirements：不能留空、借用其他分配器检查或只打印成功。�
 
 输出要求：列出用例目的、预期、实际结果及覆盖理由，提供可复现命令。测试复杂度不作要求，但不得删除检查、修改预期来迎合错误实现，或将未执行的项目标为通过。
 
-## [RELY]
+##### [RELY]
 
 阅读 `buddy_pmm.c`、`buddy_pmm.h`、`pmm.c`、`pmm.h`、`memlayout.h`、`libs/list.h` 及构建规则，以实际代码为准。已有 `buddy_check()` 仅为基础自检，不能代替本次独立测试。
 
@@ -474,7 +433,7 @@ Requirements：不能留空、借用其他分配器检查或只打印成功。�
 - 伙伴关系依据绝对物理页号，不能仅凭相邻判断；空闲块首页的 `property` 为块页数，已分配首页的 `property` 为原始请求长度。
 - QEMU 4.1.1 已安装在 WSL：`/home/catalpa/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64`。必须显式使用该版本，保留原启动流程。
 
-## [GUARANTEE]
+##### [GUARANTEE]
 
 在 `buddy_test.c` 实现以下测试函数，在 `buddy_test.h` 声明统一入口；允许增加私有辅助函数：
 
@@ -490,9 +449,9 @@ static void test_invalid_request(unsigned int case_id);
 
 构建接口：`PMM=buddy BUDDY_TEST=1` 启用测试；`BUDDY_TEST_CASE=0` 执行正常用例，其他编号各执行一个非法调用用例。说明编号与预期断言的对应关系，拒绝非法选项。
 
-## [SPECIFICATION]
+##### [SPECIFICATION]
 
-### 测试隔离与统一规则
+###### 测试隔离与统一规则
 
 1. 在 `pmm_init()` 的 `init_pmm_manager()` 之后、`page_init()` 之前调用可选测试入口。此时真实空闲页尚未登记，可以安全建立受控状态；不在正常分配运行中重置管理器。
 2. 使用模块私有静态 `Page` 数组作为测试描述符，临时设置 `pages`、`npage`，保留 `nbase`。各用例重置测试区，将待登记页标为保留，再调用真实管理器登记指定区域。测试区大小应足以构造下述场景。
@@ -500,13 +459,13 @@ static void test_invalid_request(unsigned int case_id);
 4. 用简单的逐页记录核对范围、不重叠与实际占用，独立计算期望页数，不直接将分配器返回的计数当成预期。不依赖同阶链表的插入顺序。
 5. 每项使用真实断言并输出用例名；正常用例全部执行成功后才打印汇总通过。默认构建不运行扩展测试，原有 `buddy_check()` 继续保留。
 
-### buddy_test_all
+###### buddy_test_all
 
 Pre-Condition：已选择并初始化 Buddy，尚未调用真实 `page_init()`；测试开关开启。
 
 Post-Condition：正常模式执行全部正常用例并恢复初始环境，随后正常启动；非法调用模式只运行指定用例。场景构造失败必须报错，不能跳过后仍宣称全部通过。
 
-### test_init_memmap
+###### test_init_memmap
 
 Pre-Condition：使用空的受控管理器，描述符已初始化为保留状态。
 
@@ -514,7 +473,7 @@ Post-Condition：核对完整登记、计数及保留区保护。
 
 Case：覆盖对齐的二次幂区域、起点不满足大块对齐且长度为 13 页的区域、多次登记的相邻区域，以及中间留有保留页的分离区域。逐页申请至耗尽，确认只返回登记页、不丢页、不重复；归还后计数恢复，保留页未被分配或错误合并。
 
-### test_split_merge
+###### test_split_merge
 
 Pre-Condition：只登记一个对齐的完整块，例如连续 16 页。
 
@@ -526,13 +485,13 @@ Case 2：按物理位置释放真正伙伴，检查可重新申请对应大块�
 
 Case 3：页从 0 编号，仅释放块内相邻的第 1、2 号页，其绝对页号不互为伙伴；其他页保持分配，申请 2 页必须失败。再释放对应伙伴后检查逐级合并，避免把任意相邻页都当伙伴。
 
-### test_rounding
+###### test_rounding
 
 Pre-Condition：测试区足以容纳多个同时存活的分配块。
 
 Post-Condition：覆盖请求 1、2、3、5、8、9 页，分别按实际占用 1、2、4、8、8、16 页检查计数、对齐和互不重叠；按原始请求长度释放，全部回收后计数恢复。取整产生的余量不能再次分配。
 
-### test_failure
+###### test_failure
 
 Pre-Condition：分别构造空管理器、全部占用及碎片化空闲状态。
 
@@ -540,13 +499,13 @@ Post-Condition：无可用页、请求超过容量、超大请求（如 `(size_t
 
 Case：先把完整区域按单页全部分配，再仅释放每对伙伴中的一页，形成总空闲页数足够、却没有 2 页块的状态；申请 2 页应失败。随后仍能正确分配剩余单页并完整回收，验证失败未破坏状态。
 
-### test_reuse
+###### test_reuse
 
 Pre-Condition：使用已知大小的受控区域。
 
 Post-Condition：以固定、可复现的混合页数请求和不同释放顺序重复多轮；每步核对计数及存活区间，每轮全部释放后恢复初始状态，并再次申请完整块，检验泄漏、重复入链和合并遗漏。
 
-### test_invalid_request
+###### test_invalid_request
 
 Pre-Condition：每个用例在独立的 QEMU 启动中执行，先构造合法前置状态并输出用例标识。
 
@@ -554,7 +513,7 @@ Post-Condition：零页申请、重复释放、错误释放长度、内部页释
 
 Requirements：预期断言会终止本次启动，不与正常用例连续执行。核对用例标识及对应断言位置或条件；仅发生超时、任意崩溃或未进入内核，不能判定通过。若非法操作意外返回，立即报告测试失败。
 
-### 编译、运行与交付
+###### 编译、运行与交付
 
 - 每次改变测试开关、后端或用例编号前干净构建。正常运行示例：`make qemu PMM=buddy BUDDY_TEST=1 BUDDY_TEST_CASE=0 QEMU=/home/catalpa/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64`；实际执行前先 `make clean`。
 - 正常测试后必须继续完成真实内存初始化和原基础自检；逐个独立启动非法用例，保存实际输出及预期判断。测试代码在默认关闭时也应正常编译。
