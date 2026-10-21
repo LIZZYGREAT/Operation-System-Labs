@@ -44,7 +44,7 @@ Requirements：特殊的时序要求、并发约束、性能要求，或者其�
 
 ### 任务二：实现 Best-Fit 连续物理内存分配算法
 
-> 本文件只记录本人的 Lab2 提示词。每次收到用户新消息，在完成该轮工作后，将消息整理为下方 `[PROMPT]`、`[RELY]`、`[GUARANTEE]`、`[SPECIFICATION]` 结构再追加；不原样保留未整理文本，也不纳入其他成员的任务提示。
+> 本文件只记录本人的 Lab2 实验相关提示词。收到与实验任务相关的新消息后，在完成该轮工作后，将其整理为下方 `[PROMPT]`、`[RELY]`、`[GUARANTEE]`、`[SPECIFICATION]` 结构再追加。分支、提交状态及提示词文件本身的管理对话不收录；不纳入其他成员的任务提示。
 
 ### 2026-10-20：项目环境、要求与 B 线分工核对
 
@@ -200,59 +200,50 @@ Requirements：特殊的时序要求、并发约束、性能要求，或者其�
 - `make -j2` 因 `kern/mm/pmm.c:77` 调用未声明的 `page_init()` 且 `-Werror` 而失败；这是 A 任务尚未完成导致的完整构建阻塞。本轮未修改 `pmm.c`、未切换 B2、未修复 Best-Fit 代码。随后 `make clean` 清除了本轮生成的 `code/obj`。
 - 当前可独立交付 B1 源码审查结果；尚未完成依赖 `page_init()` 的全项目链接、QEMU 启动及集成验收。
 
-### 2026-10-20：同步个人工作分支并规范提示词记录
+### 2026-10-20：B2 接入 Best-Fit 并验收
 
 [PROMPT]
 
-任务：将 origin/lab2 的最新内容更新到个人工作分支，并将个人 report/prompt.md 调整为 lab2 当前采用的提示词格式。
+任务：将已完成的 Best-Fit 分配器接入 Lab2 内核，完成 B2 构建与运行验收。
 
-操作要求：个人分支的提示词文件只保留本人任务记录，不复制其他成员的任务提示词。今后每次收到用户文本，先按本文件模板整理，再追加到 prompt.md。保留实验代码，本轮只调整分支和提示词文件。
+操作要求：先确认 `page_init()`、default First-Fit 基线和 B1 实现均已完成；只在 `pmm.c` 的 `init_pmm_manager()` 切换分配器，不修改 `page_init()`、测试或评分脚本。失败时区分构建、页初始化、分配器与运行环境问题。
 
-输出要求：说明远端同步状态、个人分支状态、提示词调整范围和剩余事项。
+输出要求：报告改动、调用链、实际测试命令与输出、验收结论；不自动提交。
 
 [RELY]
 
-- 当前最新共享分支为 origin/lab2，HEAD 为 2db2571（feat: implement page_init()）。
-- 格式依据是 lab2 分支 report/prompt.md 开头的 [PROMPT]、[RELY]、[GUARANTEE]、[SPECIFICATION] 模板。
-- 正确的个人工作分支为 work/lab2/ganwenjie；之前误建的 work/lab2/wenjie 应删除。
-- 个人 Best-Fit 记录位于功能模块2；功能模块1的 page_init 提示属于其他成员任务。
+- `kern/mm/pmm.c` 负责管理器注册、物理页初始化调用及分配接口动态分派。
+- `kern/mm/best_fit_pmm.c` 已提供 `best_fit_pmm_manager` 与固定 `best_fit_check()`。
+- `tools/test_lab2.c` 和 `tools/grade.sh` 提供 Lab2 自动验收；评分脚本会检查 Page Init 与 Best-Fit 的输出。
 
 [GUARANTEE]
 
-- 切换到已有的 work/lab2/ganwenjie，并把 origin/lab2 的最新内容合入。
-- 删除误建的 work/lab2/wenjie 本地分支。
-- report/prompt.md 保留公共格式模板和本人 Best-Fit 相关记录，移除其他成员的任务提示。
-- 本轮用户文本以本模板格式记录；今后收到的新文本也按该格式整理后记录。
-- 不修改实验代码，只更新分支内容与个人提示词文件。
+- 基线通过后，将注册对象切换为 `best_fit_pmm_manager`，保留既有打印及其他初始化代码。
+- 验证 `pmm_init()`、`page_init()`、`init_memmap()`、`check_alloc_page()` 及分配/释放接口的动态分派关系。
+- 实际执行 Makefile 构建、QEMU 运行和 `make grade`；不改测试脚本、不补写 A 的实现。
 
 [SPECIFICATION]
 
-## 同步个人工作分支
+## B2 接入与验收
 
-Pre-Condition：origin/lab2 的最新远端引用已获取，个人已有工作分支和提示词内容均可访问。
+Pre-Condition：`page_init()` 已实现；default 管理器可以初始化内存并通过 First-Fit 自检；B1 Best-Fit 回调已完成，固定测试未修改。
 
-Post-Condition：当前工作分支为 work/lab2/ganwenjie，包含最新 origin/lab2 的共享内容和个人提示词；共享分支不变。
+Post-Condition：`init_pmm_manager()` 注册 Best-Fit，内核初始化经由该管理器完成，固定自检与自动评分通过。
 
-Case 1：work/lab2/ganwenjie 已存在
+Case 1：前置条件缺失
 
-切换到本地个人分支并将 origin/lab2 合入，不创建同名替代分支。
+报告缺少的证据并停止切换，不修改其他成员负责的实现，也不跳过基线。
 
-Case 2：提示词文件发生冲突
+Case 2：前置条件满足
 
-保留个人 Best-Fit 记录和标准格式，移除其他成员的 page_init 任务提示；不得覆盖个人记录。
+只修改管理器注册指针，执行构建、QEMU 与 `make grade`。若 QEMU 始终运行，使用有界超时安全结束并区分预期停止与启动失败。
 
-Requirements：保留其他成员已合入的最新代码与报告，只让个人 prompt.md 保持个人任务记录。
+Requirements：确认固定 `best_fit_check()` 实际成功；自动评分必须通过 Page Init 和 Best-Fit 两项。不能只以管理器指针注册检查代替算法自检。
 
-## 整理个人 prompt.md
+**检查与处理记录**
 
-Pre-Condition：以最新 lab2 的 prompt.md 作为格式参考，区分本人 Best-Fit 任务与其他成员的 page_init 任务。
-
-Post-Condition：保留 [PROMPT]、[RELY]、[GUARANTEE]、[SPECIFICATION] 格式说明和本人相关记录；不保留其他成员的 page_init 任务提示。
-
-Requirements：当前及后续用户文本需规范化到上述结构后记录；此前明确排除记录的消息不补录。
-
-**处理结果**
-
-- `git fetch origin` 后确认 `origin/lab2` 为 2db2571；远端个人分支为 `work/lab2/ganwenjie`。
-- 切换到正确分支并合入最新共享内容；唯一冲突在 `report/prompt.md`，已保留个人 Best-Fit 记录并按模板解决。
-- 删除误建的本地 `work/lab2/wenjie`；未修改实验代码。
+- 前置检查发现 `page_init()` 已由 A 实现，当前 default 管理器和 B1 源码均未改动，Best-Fit 固定测试未修改。
+- default 基线 `make` 退出 0；`timeout --foreground --signal=INT --kill-after=2s 6s make qemu` 启动到内核并输出 `memory management: default_pmm_manager`、`check_alloc_page() succeeded!`，之后以 124 结束，这是超时安全中断内核空闲循环。
+- 仅将 `kern/mm/pmm.c` 的 `init_pmm_manager()` 注册指针改为 `best_fit_pmm_manager`。`make` 退出 0；QEMU 输出 `memory management: best_fit_pmm_manager` 及 `check_alloc_page() succeeded!`，证明管理器固定自检通过。
+- `make grade` 退出 0，评分为 `Total Score: 20/20`，Page Init 与 Best-Fit 两项均为 `OK`。评分脚本将 QEMU 串口写入临时文件，因此另在临时副本运行原注入脚本并从串口确认 `[Test 1] Page Init: PASS`、`[Test 2] Best-Fit: PASS`；测试与脚本未修改。
+- `git diff --check` 通过；源码 diff 仅改 `pmm.c` 中注册指针，未自动提交。
