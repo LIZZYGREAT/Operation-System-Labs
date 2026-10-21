@@ -99,11 +99,11 @@ make grade PMM=best_fit QEMU="$QEMU411"
 | 非法 `PMM=invalid` | 构建阶段按预期拒绝 |
 | 受保护源文件与差异检查 | 原有算法、启动代码和固定测试未修改；`git diff --check` 通过 |
 
-原始启动日志：
+启动自检的回归记录统一保存在 [buddy_tests](buddy_tests/)：
 
-- [Buddy](buddy_qemu_4.1.1.log)
-- [Best-Fit](best_fit_qemu_4.1.1.log)
-- [默认 First-Fit](first_fit_qemu_4.1.1.log)
+- [Buddy](buddy_tests/regression_buddy.log)
+- [Best-Fit](buddy_tests/regression_best_fit.log)
+- [默认 First-Fit](buddy_tests/regression_default.log)
 
 基础自检在两轮申请/释放中检查单页、申请 3 页实际占用 4 页、块不重叠、回收复用，以及各阶块的对齐、首页标记、链表和空闲计数一致性；另检查超大请求失败且不改变空闲计数。
 
