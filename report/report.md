@@ -182,6 +182,20 @@ default First-Fit 基线构建和启动自检通过后，只在 `pmm.c` 的 `ini
 - 测试通过的结果（make grade），只有一个
 -->
 
+### A 线：物理内存初始化阶段验证
+
+以下阶段性结果及截图保留自 `2ada293` 的小组报告，负责人为 2413318-向宇航。基线构建截图显示，未完成的 Best-Fit 实现因 `free_list`、`nr_free` 未声明而编译失败：
+
+![Best-Fit 尚未完成时的基线构建错误](./images/baseline.png)
+
+完成 `page_init()` 并补齐 Best-Fit 模块后，`make qemu` 成功启动，初始化时仍注册 `default_pmm_manager`，并输出物理内存范围、页描述符范围和 `check_alloc_page() succeeded!`：
+
+![物理内存初始化后的 QEMU 输出](./images/init.png)
+
+该阶段的 `make grade` 截图显示 Page Init 为 `OK`，Best-Fit 为 `WRONG`，总分 `10/20`。这是 Best-Fit 接入验收前的中间结果；后续 B2 的最终评分见下表，为 `20/20`：
+
+![阶段性 make grade 结果](./images/init_check.png)
+
 ### B1：Best-Fit 分配器验证
 
 固定 `best_fit_check()` 检查空闲块首标记与 `nr_free` 总量、基本分配/释放、空链表分配失败、拆分以及对 1 页块和 2 页块的选择。其临时测试会保存 `free_list` 和 `nr_free`，隔离链表并将计数清零，完成后恢复原状态。`tools/test_lab2.c` 中的 `test_best_fit()` 只检查管理器注册指针；实际算法断言由 `pmm_init()` 调用的 `best_fit_check()` 执行。
@@ -205,24 +219,6 @@ default First-Fit 基线构建和启动自检通过后，只在 `pmm.c` 的 `ini
 - 临时 harness 首次运行时使用了错误的手工总页数期望值。定位后改正 harness 期望值并重编重跑通过，没有修改生产代码。
 - 没有独立测试 `n == 0`、非法或重叠释放、极大页数/计数溢出、并发分配、其他 DTB 内存布局、压力下长期碎片率或分配器性能。调用者应遵守接口前置条件；当前结果不能证明上述边界。
 - 本轮整理时当前仓库没有 `docs/lab2/requirements.md`，相关课程要求需再对照原文件人工复核。B1 harness 的原始源文件和输出也未归档。
-
-### 验证初始化函数
-
-在lab2代码的修改之前，运行 `make qemu`，可以编译过程中有报错，如下图所示：
-
-![基线截图](./images/baseline.png)
-
-从中可见是基线代码中 best-fit 模块未实现导致。
-
-在添加完初始化函数，并且补全了 best-fit 模块后，运行 `make qemu`，如下图所示：
-
-![初始化编译截图](./images/init.png)
-
-此时可以成功编译。
-
-此时运行本次实验提供的测试脚本 `make grade`，可以看到初始函数的验证通过，截图如下：
-
-![初始化验证截图](./images/init_check.png)
 
 ---
 
