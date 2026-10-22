@@ -506,3 +506,88 @@ Case 3：实际 QEMU 版本与指导书示例不同，依据当前源码重建�
 
 Requirements：输出代码依据，区分已静态确认和需要运行确认的结论；禁止新增冗余日志、永久断点或模拟器补丁。
 ```
+
+#### 提示十三：独立复核 page_init() 的地址计算与初始化不变量
+
+```text
+[PROMPT]
+
+任务：
+执行 B5，对 A 已实现的 page_init() 做独立代码复核。目标不是重新开发 A 的功能，而是确认 DTB 提供的物理内存范围如何一步步变为 Page 描述符数组及最终的空闲物理页区间，是否满足真实内存布局与实验固定测试要求。
+
+操作要求：
+只读检查 code/kern/mm/pmm.c 中的 page_init()、kern/init/init.c 的调用顺序、kern/driver/dtb.c 的内存范围提取、kern/mm/memlayout.h、pmm.h 的宏和转换函数、tools/test_lab2.c 的测试断言。结合当前内核高虚拟地址映射，分别列出 VA、PA、PPN 与 Page*，不要混淆 PADDR 与 pa2page。
+
+输出要求：
+按“DTB 输入 → nbase/npage → 内核 end 物理地址 → Page 数组起止位置 → 空闲区起点/终点 → init_memmap 注册”完整推导变量和地址范围。列出每条检查所依据的代码、计算关系、预期条件和审查结论；对实际问题写清复现条件与影响，不擅自修改 A 的文件。
+
+[RELY]
+
+- code/kern/mm/pmm.c：page_init() 和 pmm_init()。
+- code/kern/driver/dtb.c、dtb.h；code/kern/init/init.c。
+- code/kern/mm/memlayout.h、pmm.h、default_pmm.c、best_fit_pmm.c。
+- code/tools/test_lab2.c 的 Page Init 断言。
+- kernel.ld 的 end 符号与固定 128 MiB DRAM 地址上界。
+
+[GUARANTEE]
+
+- 交付一份具体地址/状态检查表和代码定位依据。
+- 检查描述符数组本身不能被分配、内核镜像/启动页表/栈所占页面均保留、只有完整空闲页进入分配器。
+- 明确当前实现的运行假设和已测配置，不用仅通过 grade 推断任意 DTB/RAM 布局都正确。
+- 只审阅，发现问题由 A 负责人处理；不修改 page_init() 或已完成的 Best-Fit。
+
+[SPECIFICATION]
+
+Pre-Condition：A1/A2 已有基线实现，B2 可以使用 Best-Fit 正常启动的历史记录。
+
+Post-Condition：能够解释 page_init() 如何计算每个地址和计数，及每个 Page 描述符最终属于保留区还是空闲区，并输出通过/存疑/需修复项。
+
+Case 1：默认 DRAM [0x80000000,0x88000000)，确认 nbase、npage、描述符容量、页对齐和空闲页总量的关系。
+Case 2：DTB 内存范围无效或不包含内核，核对其拒绝初始化的行为；这些情况如未实际测试，应只标注静态检查结果。
+Case 3：报告内存上限与 PHYSICAL_MEMORY_END 不同，检查 managed_end 截断及其与 test_lab2.c 期望 npage 计算的关系，区分设计限定与实际 Bug。
+Case 4：内核 end、描述符数组或对齐计算靠近内存末端，检查容量乘法、空闲区不越界、空闲区为空时是否跳过 init_memmap。
+
+Requirements：特别核对 PHYSICAL_MEMORY_OFFSET、KERNEL_BEGIN_PADDR、PageReserved、SetPageProperty、page2pa/pa2page 与实际分配区间；避免要求 A 增加与课程无关的复杂兼容或过度防御。
+```
+
+#### 提示十四：复现页初始化验收并形成 B5 审核意见
+
+```text
+[PROMPT]
+
+任务：
+在 B5 的只读审查基础上，独立复现当前代码的页初始化验收，形成提交给 A 负责人的审核意见。重点证明是否有证据支持 page_init() 已正确排除内核与 Page 描述符数组，并能将其余完整页面交给分配器。
+
+操作要求：
+从当前仓库可正常构建的版本开始，检查 Git 状态和调试环境。在不修改 A 代码和固定测试的前提下，按实际可行流程进行 make、限时 make qemu、make grade。当前默认注册 Best-Fit，因此如需复核 First-Fit 历史基线，应使用已有 A2 日志、独立干净工作树或经同意的临时分支，不能直接破坏正式共享代码和已通过的 B2 接入。
+
+复核 Page Init 固定测试涵盖的 offset、DTB、npage、pages 对齐/位置、nr_free、内核尾页保留、描述符数组占用页保留和 page2pa/pa2page 往返；对测试未覆盖的内容，结合代码静态检查，必要时提出最小的独立测试建议。
+
+输出要求：
+提供具体命令、退出码和关键日志、每条审核意见的代码位置及影响程度；将结论分为“通过/需 A 修复/证据不足”。不改 A 代码，不自动提交。若发现问题，给出可直接交给 A 的最小修复要求，但由 A 决定并实施。
+
+[RELY]
+
+- B5-1 的地址布局分析与问题清单。
+- code/Makefile、tools/grade.sh、tools/test_lab2.c。
+- report/report.md 的 A2/B2 历史记录及当前 Git 状态。
+- README.md 的工作分支与独立复现规范。
+
+[GUARANTEE]
+
+- 交付能独立复核的 B5 结论，不以 Best-Fit 的注册检查代替页初始化测试。
+- 不改动其他成员负责的源码、测试或评分逻辑；不能以清理构建目录为由删除他人的修改。
+- 失败时保留证据，分清环境、启动、A 初始化、B 分配算法等问题来源。
+
+[SPECIFICATION]
+
+Pre-Condition：A1/B2 当前代码可获取；如本地工具缺失，先记录阻塞并停止实际运行。
+
+Post-Condition：B5 审查有可复现依据；针对 A 的问题形成明确的代码位置、输入条件、预期状态、实际结果与建议。
+
+Case 1：全部实际执行的检查通过，记为当前测试配置下 B5 审核通过，并说明尚未覆盖的特殊 RAM/DTB 情形。
+Case 2：构建或运行失败，记录首个具体错误和归属，不替 A 或 B 隐式修改代码。
+Case 3：仅静态发现潜在问题但没有失败用例，明确标注为“风险/待验证”，不写成已复现 Bug。
+
+Requirements：与 A 交叉审核后再将 B5 正式标为完成；保留实际运行证据和反馈记录。
+```
