@@ -542,14 +542,56 @@ Requirements：
 将需求、实现职责、First-Fit/Best-Fit 对比、测试结果、改进空间和未验证边界放入合适章节；有证据缺口的内容保留明确说明，不把未运行项目写成通过。
 ```
 
-### 扩展任务Challenge：任意大小的内存单元 slub 分配算法
-
-#### 提示词1：实现并接入简化 SLUB
+#### 提示十：审查 B3 双重 GDB 调试环境
 
 ```
 [PROMPT]
 
 任务：
+完成 Lab2 B3 的环境审查和调试方案确认，先不要编译新的 QEMU，也不要修改项目文件。目标是弄清本机现有工具链、QEMU 版本及源码位置，并说明怎样分别调试 QEMU 宿主进程和运行在其中的 RISC-V ucore。
+
+操作要求：
+以当前工作目录中的实际仓库与工具为准，从 code/ 目录读取 Makefile 的 debug、gdb、qemu 目标；检查 QEMU 安装路径、版本、可用源代码及 GNU GDB、RISC-V GDB。检查 git status、分支和当前可用的调试权限。优先使用项目已有工具，不能直接假定指导书提到的 QEMU 4.1.1 就是当前运行的版本。
+
+输出要求：
+给出简洁的环境检查表、实际执行命令及结果、三个终端的角色、需要的最少构建/调试动作与明确的阻塞项；最终向我说明是否可以开始 B3-2。不得在这一阶段改代码。
+
+[RELY]
+
+- README.md 中的分支协作规范。
+- code/Makefile 的 make debug、make gdb、make qemu，以及 QEMU 变量覆盖方式。
+- code/tools/gdbinit、code/bin/kernel（如果当前构建后存在）。
+- 本机 command -v、--version、readelf、pgrep、gdb、riscv64-unknown-elf-gdb 等工具。
+- 实验指导书中的双 GDB 任务要求，只作为任务参考，不代替实际版本检查。
+
+[GUARANTEE]
+
+- 交付一份真实环境表：宿主架构、QEMU 二进制路径与版本、QEMU 源码路径/版本、宿主 GDB、RISC-V GDB、工具链和必要权限。
+- 交付一份明确的“QEMU 进程 / QEMU GDB stub / ucore 客体 CPU”三者关系说明。
+- 不更改 Makefile、内核源码、系统 QEMU 安装及系统 ptrace 安全配置。
+
+[SPECIFICATION]
+
+Pre-Condition：本地仓库可以读取，B1/B2 已有集成代码，但不预设所有调试工具已经安装。
+
+Post-Condition：确定下一阶段要使用的 QEMU 源码和可执行文件，识别需要新增或重新编译的组件；记录实际版本是否与指导书一致。
+
+Case 1：现有 QEMU 源码与带符号可执行文件版本匹配，则复用现有构建，避免重复安装。
+
+Case 2：只有系统 QEMU 或源码/可执行文件不匹配，则说明需要单独编译的范围和路径，不直接替换系统程序。
+
+Case 3：GDB、工具链或 ptrace 权限不足，报告具体错误、最小修复方案及其影响，不静默变更安全设置。
+
+Requirements：不得把 make gdb 当成宿主机 GDB；不得因为终端里只有某个程序名就推测其架构或版本。最后给出 B3-2 的前置条件是否满足。
+```
+
+### 扩展任务 Challenge：任意大小的内存单元 SLUB 分配算法
+
+#### 提示词一：实现并接入简化 SLUB
+
+```text
+[PROMPT]
+
 在现有 RISC-V ucore Lab2 工程中，从零实现简化的 SLUB 内存对象分配模块，并接入内核。
 
 实现两层分配：
@@ -693,9 +735,182 @@ Requirements：
 ```
 
 
-#### 提示词2：为前述实验生成测试
+#### 提示十一：完成 B3 双 GDB 最小联调
 
 ```
+[PROMPT]
+
+任务：
+完成 B3 的实际环境准备与最小联调。根据 B3-1 确认的 QEMU 版本和源码路径，生成或复用可让宿主机 GDB 设置源码断点的 QEMU 可执行文件，并用当前 Lab2 内核完成一次双 GDB 连通性验证。
+
+操作要求：
+先确认源码与目标 QEMU 版本匹配，检查已有 build 目录和构建系统，再采用对应版本支持的调试编译参数构建。不要照搬不匹配版本的 configure/meson/ninja 命令，不在未确认的目录执行破坏性清理命令，也不要 sudo make install 替换系统 QEMU。
+
+在 code/ 目录使用 QEMU 变量覆盖方式调用 make debug，而不是永久改写 Makefile。建立三个终端：终端1运行 QEMU；终端2用宿主机 GDB 调试 QEMU 进程本身；终端3通过 make gdb 连接 QEMU 的 GDB stub，观察 RISC-V 内核寄存器和指令。
+
+若宿主 GDB attach 被 ptrace 策略阻止，优先采用在宿主 GDB 下直接启动调试版 QEMU 的等效方案，说明与三终端模式的差别；修改系统安全参数前必须征询我。
+
+[RELY]
+
+- B3-1 环境审查结果（版本、路径、权限）。
+- code/Makefile 的 -s -S、QEMU 变量及 make gdb 配置。
+- 与 QEMU 可执行文件严格对应的源代码及调试符号。
+- code/bin/kernel 的调试符号和实际构建产物。
+
+[GUARANTEE]
+
+- 交付能重复执行的 QEMU 调试版构建命令及其准确产物路径。
+- 交付三个终端各自的启动、设置断点、continue/单步、退出命令与实际验证结果。
+- 至少确认：宿主 GDB 能解析 QEMU 的一个真实源码符号或停在其函数入口；客体 GDB 能连接 QEMU 并读取 $pc、$satp 与反汇编指令。
+- 不更改内核算法、测试与 Makefile；不替换系统 QEMU；不自动提交。
+
+[SPECIFICATION]
+
+Pre-Condition：B3-1 明确了匹配的版本与源代码位置，内核可构建；若不满足，则只给出阻塞信息。
+
+Post-Condition：获得一套能从头复现的双 GDB 调试流程，包含启动时序、端口、符号文件、实际 PID 或直接启动方法，以及截图/日志保存位置。
+
+Case 1：宿主 GDB attach 成功，分别验证 QEMU 进程上的源码断点与 ucore 的客体指令断点。
+
+Case 2：无法 attach，但可在宿主 GDB 内运行 QEMU，改用直接启动方式验证；不得申请不必要的系统级权限。
+
+Case 3：QEMU 调试构建失败，记录第一处真实错误、依赖及版本，停止后续步骤；不要用无符号的二进制冒充可源码调试版本。
+
+Case 4：宿主 GDB 暂停 QEMU 时客体 GDB 暂时无响应，应解释这一执行依赖并安排 continue/step 的合理顺序，不误判为连接失败。
+
+Requirements：逐条列出实际命令、退出码和关键输出。此阶段只验证双层调试可用，不要求完成 Sv39 逐级页表分析；完成后明确 B3 是否能够验收。
+```
+
+#### 提示十二：分析 QEMU RISC-V Sv39 访存与 TLB 路径
+
+```
+[PROMPT]
+
+任务：
+进入 B4，但先不要急于打随机断点。使用 B3 已经确认的 QEMU 源码版本，找出 RISC-V 访存、地址转换缓存、TLB 未命中处理、Sv39 页表遍历和权限检查涉及的真实函数，画出一条由指令访存到物理地址的调用关系。只阅读源码，不修改项目。
+
+操作要求：
+不要凭记忆硬写 QEMU 函数名；必须通过源码搜索和调用方确认。区分 QEMU 自身的 TCG/软件 TLB 加速路径，与 RISC-V 客体架构的 Sv39 硬件页表翻译逻辑；明确哪些路径会在 TLB 命中时绕过一般的页表遍历函数。
+
+输出要求：
+给出对应版本的源码路径、函数名、调用关系、关键分支条件及阅读定位信息；在每个关键节点说明输入是什么（VA、访问类型、特权级、satp 等）、输出是什么，以及下一步访问什么。给出下一阶段最适合观察的断点候选位置，不要直接宣称已经跟踪成功。
+
+[RELY]
+
+- B3 已确认的 QEMU 版本和完整源码。
+- code/kern/init/entry.S 的 satp 切换与启动页表。
+- code/kern/mm/mmu.h、code/kern/mm/pmm.c；现有 Lab2 内核可用于验证。
+- GDB 的 info functions、break、bt、list、info locals 和源码搜索能力。
+
+[GUARANTEE]
+
+- 输出一个基于真实函数的调用路径，不使用无依据的“翻译函数”占位名代替结论。
+- 区分页表遍历与缓存命中路径，注明需动态调试才可确认的分支。
+- 不修改 QEMU、ucore、Makefile、测试或报告正文。
+
+[SPECIFICATION]
+
+Pre-Condition：B3 双 GDB 可以使用，宿主 GDB 能读取匹配源码符号。
+
+Post-Condition：得到下一阶段可执行的断点方案和观察字段清单，包括如何识别一次地址转换成功、页错误或无页表遍历。
+
+Case 1：源码有独立 RISC-V 地址转换函数，解释它如何根据 satp、VPN、PTE、权限计算 PA。
+
+Case 2：TLB 命中不经过该函数，明确应在其他路径观察，避免用“断点没触发”证明没有 TLB。
+
+Case 3：实际 QEMU 版本与指导书示例不同，依据当前源码重建路径，不强行套用 QEMU 4.1.1 的文件结构。
+
+Requirements：输出代码依据，区分已静态确认和需要运行确认的结论；禁止新增冗余日志、永久断点或模拟器补丁。
+```
+
+#### 提示十三：独立复核 page_init() 的地址计算与初始化不变量
+
+```text
+[PROMPT]
+
+任务：
+执行 B5，对 A 已实现的 page_init() 做独立代码复核。目标不是重新开发 A 的功能，而是确认 DTB 提供的物理内存范围如何一步步变为 Page 描述符数组及最终的空闲物理页区间，是否满足真实内存布局与实验固定测试要求。
+
+操作要求：
+只读检查 code/kern/mm/pmm.c 中的 page_init()、kern/init/init.c 的调用顺序、kern/driver/dtb.c 的内存范围提取、kern/mm/memlayout.h、pmm.h 的宏和转换函数、tools/test_lab2.c 的测试断言。结合当前内核高虚拟地址映射，分别列出 VA、PA、PPN 与 Page*，不要混淆 PADDR 与 pa2page。
+
+输出要求：
+按“DTB 输入 → nbase/npage → 内核 end 物理地址 → Page 数组起止位置 → 空闲区起点/终点 → init_memmap 注册”完整推导变量和地址范围。列出每条检查所依据的代码、计算关系、预期条件和审查结论；对实际问题写清复现条件与影响，不擅自修改 A 的文件。
+
+[RELY]
+
+- code/kern/mm/pmm.c：page_init() 和 pmm_init()。
+- code/kern/driver/dtb.c、dtb.h；code/kern/init/init.c。
+- code/kern/mm/memlayout.h、pmm.h、default_pmm.c、best_fit_pmm.c。
+- code/tools/test_lab2.c 的 Page Init 断言。
+- kernel.ld 的 end 符号与固定 128 MiB DRAM 地址上界。
+
+[GUARANTEE]
+
+- 交付一份具体地址/状态检查表和代码定位依据。
+- 检查描述符数组本身不能被分配、内核镜像/启动页表/栈所占页面均保留、只有完整空闲页进入分配器。
+- 明确当前实现的运行假设和已测配置，不用仅通过 grade 推断任意 DTB/RAM 布局都正确。
+- 只审阅，发现问题由 A 负责人处理；不修改 page_init() 或已完成的 Best-Fit。
+
+[SPECIFICATION]
+
+Pre-Condition：A1/A2 已有基线实现，B2 可以使用 Best-Fit 正常启动的历史记录。
+
+Post-Condition：能够解释 page_init() 如何计算每个地址和计数，及每个 Page 描述符最终属于保留区还是空闲区，并输出通过/存疑/需修复项。
+
+Case 1：默认 DRAM [0x80000000,0x88000000)，确认 nbase、npage、描述符容量、页对齐和空闲页总量的关系。
+Case 2：DTB 内存范围无效或不包含内核，核对其拒绝初始化的行为；这些情况如未实际测试，应只标注静态检查结果。
+Case 3：报告内存上限与 PHYSICAL_MEMORY_END 不同，检查 managed_end 截断及其与 test_lab2.c 期望 npage 计算的关系，区分设计限定与实际 Bug。
+Case 4：内核 end、描述符数组或对齐计算靠近内存末端，检查容量乘法、空闲区不越界、空闲区为空时是否跳过 init_memmap。
+
+Requirements：特别核对 PHYSICAL_MEMORY_OFFSET、KERNEL_BEGIN_PADDR、PageReserved、SetPageProperty、page2pa/pa2page 与实际分配区间；避免要求 A 增加与课程无关的复杂兼容或过度防御。
+```
+
+#### 提示十四：复现页初始化验收并形成 B5 审核意见
+
+```text
+[PROMPT]
+
+任务：
+在 B5 的只读审查基础上，独立复现当前代码的页初始化验收，形成提交给 A 负责人的审核意见。重点证明是否有证据支持 page_init() 已正确排除内核与 Page 描述符数组，并能将其余完整页面交给分配器。
+
+操作要求：
+从当前仓库可正常构建的版本开始，检查 Git 状态和调试环境。在不修改 A 代码和固定测试的前提下，按实际可行流程进行 make、限时 make qemu、make grade。当前默认注册 Best-Fit，因此如需复核 First-Fit 历史基线，应使用已有 A2 日志、独立干净工作树或经同意的临时分支，不能直接破坏正式共享代码和已通过的 B2 接入。
+
+复核 Page Init 固定测试涵盖的 offset、DTB、npage、pages 对齐/位置、nr_free、内核尾页保留、描述符数组占用页保留和 page2pa/pa2page 往返；对测试未覆盖的内容，结合代码静态检查，必要时提出最小的独立测试建议。
+
+输出要求：
+提供具体命令、退出码和关键日志、每条审核意见的代码位置及影响程度；将结论分为“通过/需 A 修复/证据不足”。不改 A 代码，不自动提交。若发现问题，给出可直接交给 A 的最小修复要求，但由 A 决定并实施。
+
+[RELY]
+
+- B5-1 的地址布局分析与问题清单。
+- code/Makefile、tools/grade.sh、tools/test_lab2.c。
+- report/report.md 的 A2/B2 历史记录及当前 Git 状态。
+- README.md 的工作分支与独立复现规范。
+
+[GUARANTEE]
+
+- 交付能独立复核的 B5 结论，不以 Best-Fit 的注册检查代替页初始化测试。
+- 不改动其他成员负责的源码、测试或评分逻辑；不能以清理构建目录为由删除他人的修改。
+- 失败时保留证据，分清环境、启动、A 初始化、B 分配算法等问题来源。
+
+[SPECIFICATION]
+
+Pre-Condition：A1/B2 当前代码可获取；如本地工具缺失，先记录阻塞并停止实际运行。
+
+Post-Condition：B5 审查有可复现依据；针对 A 的问题形成明确的代码位置、输入条件、预期状态、实际结果与建议。
+
+Case 1：全部实际执行的检查通过，记为当前测试配置下 B5 审核通过，并说明尚未覆盖的特殊 RAM/DTB 情形。
+Case 2：构建或运行失败，记录首个具体错误和归属，不替 A 或 B 隐式修改代码。
+Case 3：仅静态发现潜在问题但没有失败用例，明确标注为“风险/待验证”，不写成已复现 Bug。
+
+Requirements：与 A 交叉审核后再将 B5 正式标为完成；保留实际运行证据和反馈记录。
+```
+
+#### 提示词二：为前述实验生成测试
+
+```text
 [PROMPT]
 
 任务：
