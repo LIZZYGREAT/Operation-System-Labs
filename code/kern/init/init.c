@@ -2,6 +2,9 @@
 #include <defs.h>
 #include <pmm.h>
 #include <slub.h>
+#if defined(SLUB_TEST) && SLUB_TEST
+#include <slub_test.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <dtb.h>
@@ -39,7 +42,14 @@ int kern_init(void) {
 
     // grade_backtrace();
     pmm_init();  // init physical memory management
+#if defined(SLUB_TEST) && SLUB_TEST
+    size_t slub_init_baseline = nr_free_pages();
+#endif
     slub_init(); // init object allocation after the existing PMM checks
+#if defined(SLUB_TEST) && SLUB_TEST
+    assert(nr_free_pages() == slub_init_baseline);
+    slub_check();
+#endif
 
     /* do nothing */
     while (1)
