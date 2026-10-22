@@ -375,3 +375,134 @@ Requirements：特殊的时序要求、并发约束、性能要求，或者其�
 
 将需求、实现职责、First-Fit/Best-Fit 对比、测试结果、改进空间和未验证边界放入合适章节；有证据缺口的内容保留明确说明，不把未运行项目写成通过。
 ```
+
+#### 提示十：审查 B3 双重 GDB 调试环境
+
+```
+[PROMPT]
+
+任务：
+完成 Lab2 B3 的环境审查和调试方案确认，先不要编译新的 QEMU，也不要修改项目文件。目标是弄清本机现有工具链、QEMU 版本及源码位置，并说明怎样分别调试 QEMU 宿主进程和运行在其中的 RISC-V ucore。
+
+操作要求：
+以当前工作目录中的实际仓库与工具为准，从 code/ 目录读取 Makefile 的 debug、gdb、qemu 目标；检查 QEMU 安装路径、版本、可用源代码及 GNU GDB、RISC-V GDB。检查 git status、分支和当前可用的调试权限。优先使用项目已有工具，不能直接假定指导书提到的 QEMU 4.1.1 就是当前运行的版本。
+
+输出要求：
+给出简洁的环境检查表、实际执行命令及结果、三个终端的角色、需要的最少构建/调试动作与明确的阻塞项；最终向我说明是否可以开始 B3-2。不得在这一阶段改代码。
+
+[RELY]
+
+- README.md 中的分支协作规范。
+- code/Makefile 的 make debug、make gdb、make qemu，以及 QEMU 变量覆盖方式。
+- code/tools/gdbinit、code/bin/kernel（如果当前构建后存在）。
+- 本机 command -v、--version、readelf、pgrep、gdb、riscv64-unknown-elf-gdb 等工具。
+- 实验指导书中的双 GDB 任务要求，只作为任务参考，不代替实际版本检查。
+
+[GUARANTEE]
+
+- 交付一份真实环境表：宿主架构、QEMU 二进制路径与版本、QEMU 源码路径/版本、宿主 GDB、RISC-V GDB、工具链和必要权限。
+- 交付一份明确的“QEMU 进程 / QEMU GDB stub / ucore 客体 CPU”三者关系说明。
+- 不更改 Makefile、内核源码、系统 QEMU 安装及系统 ptrace 安全配置。
+
+[SPECIFICATION]
+
+Pre-Condition：本地仓库可以读取，B1/B2 已有集成代码，但不预设所有调试工具已经安装。
+
+Post-Condition：确定下一阶段要使用的 QEMU 源码和可执行文件，识别需要新增或重新编译的组件；记录实际版本是否与指导书一致。
+
+Case 1：现有 QEMU 源码与带符号可执行文件版本匹配，则复用现有构建，避免重复安装。
+
+Case 2：只有系统 QEMU 或源码/可执行文件不匹配，则说明需要单独编译的范围和路径，不直接替换系统程序。
+
+Case 3：GDB、工具链或 ptrace 权限不足，报告具体错误、最小修复方案及其影响，不静默变更安全设置。
+
+Requirements：不得把 make gdb 当成宿主机 GDB；不得因为终端里只有某个程序名就推测其架构或版本。最后给出 B3-2 的前置条件是否满足。
+```
+
+#### 提示十一：完成 B3 双 GDB 最小联调
+
+```
+[PROMPT]
+
+任务：
+完成 B3 的实际环境准备与最小联调。根据 B3-1 确认的 QEMU 版本和源码路径，生成或复用可让宿主机 GDB 设置源码断点的 QEMU 可执行文件，并用当前 Lab2 内核完成一次双 GDB 连通性验证。
+
+操作要求：
+先确认源码与目标 QEMU 版本匹配，检查已有 build 目录和构建系统，再采用对应版本支持的调试编译参数构建。不要照搬不匹配版本的 configure/meson/ninja 命令，不在未确认的目录执行破坏性清理命令，也不要 sudo make install 替换系统 QEMU。
+
+在 code/ 目录使用 QEMU 变量覆盖方式调用 make debug，而不是永久改写 Makefile。建立三个终端：终端1运行 QEMU；终端2用宿主机 GDB 调试 QEMU 进程本身；终端3通过 make gdb 连接 QEMU 的 GDB stub，观察 RISC-V 内核寄存器和指令。
+
+若宿主 GDB attach 被 ptrace 策略阻止，优先采用在宿主 GDB 下直接启动调试版 QEMU 的等效方案，说明与三终端模式的差别；修改系统安全参数前必须征询我。
+
+[RELY]
+
+- B3-1 环境审查结果（版本、路径、权限）。
+- code/Makefile 的 -s -S、QEMU 变量及 make gdb 配置。
+- 与 QEMU 可执行文件严格对应的源代码及调试符号。
+- code/bin/kernel 的调试符号和实际构建产物。
+
+[GUARANTEE]
+
+- 交付能重复执行的 QEMU 调试版构建命令及其准确产物路径。
+- 交付三个终端各自的启动、设置断点、continue/单步、退出命令与实际验证结果。
+- 至少确认：宿主 GDB 能解析 QEMU 的一个真实源码符号或停在其函数入口；客体 GDB 能连接 QEMU 并读取 $pc、$satp 与反汇编指令。
+- 不更改内核算法、测试与 Makefile；不替换系统 QEMU；不自动提交。
+
+[SPECIFICATION]
+
+Pre-Condition：B3-1 明确了匹配的版本与源代码位置，内核可构建；若不满足，则只给出阻塞信息。
+
+Post-Condition：获得一套能从头复现的双 GDB 调试流程，包含启动时序、端口、符号文件、实际 PID 或直接启动方法，以及截图/日志保存位置。
+
+Case 1：宿主 GDB attach 成功，分别验证 QEMU 进程上的源码断点与 ucore 的客体指令断点。
+
+Case 2：无法 attach，但可在宿主 GDB 内运行 QEMU，改用直接启动方式验证；不得申请不必要的系统级权限。
+
+Case 3：QEMU 调试构建失败，记录第一处真实错误、依赖及版本，停止后续步骤；不要用无符号的二进制冒充可源码调试版本。
+
+Case 4：宿主 GDB 暂停 QEMU 时客体 GDB 暂时无响应，应解释这一执行依赖并安排 continue/step 的合理顺序，不误判为连接失败。
+
+Requirements：逐条列出实际命令、退出码和关键输出。此阶段只验证双层调试可用，不要求完成 Sv39 逐级页表分析；完成后明确 B3 是否能够验收。
+```
+
+#### 提示十二：分析 QEMU RISC-V Sv39 访存与 TLB 路径
+
+```
+[PROMPT]
+
+任务：
+进入 B4，但先不要急于打随机断点。使用 B3 已经确认的 QEMU 源码版本，找出 RISC-V 访存、地址转换缓存、TLB 未命中处理、Sv39 页表遍历和权限检查涉及的真实函数，画出一条由指令访存到物理地址的调用关系。只阅读源码，不修改项目。
+
+操作要求：
+不要凭记忆硬写 QEMU 函数名；必须通过源码搜索和调用方确认。区分 QEMU 自身的 TCG/软件 TLB 加速路径，与 RISC-V 客体架构的 Sv39 硬件页表翻译逻辑；明确哪些路径会在 TLB 命中时绕过一般的页表遍历函数。
+
+输出要求：
+给出对应版本的源码路径、函数名、调用关系、关键分支条件及阅读定位信息；在每个关键节点说明输入是什么（VA、访问类型、特权级、satp 等）、输出是什么，以及下一步访问什么。给出下一阶段最适合观察的断点候选位置，不要直接宣称已经跟踪成功。
+
+[RELY]
+
+- B3 已确认的 QEMU 版本和完整源码。
+- code/kern/init/entry.S 的 satp 切换与启动页表。
+- code/kern/mm/mmu.h、code/kern/mm/pmm.c；现有 Lab2 内核可用于验证。
+- GDB 的 info functions、break、bt、list、info locals 和源码搜索能力。
+
+[GUARANTEE]
+
+- 输出一个基于真实函数的调用路径，不使用无依据的“翻译函数”占位名代替结论。
+- 区分页表遍历与缓存命中路径，注明需动态调试才可确认的分支。
+- 不修改 QEMU、ucore、Makefile、测试或报告正文。
+
+[SPECIFICATION]
+
+Pre-Condition：B3 双 GDB 可以使用，宿主 GDB 能读取匹配源码符号。
+
+Post-Condition：得到下一阶段可执行的断点方案和观察字段清单，包括如何识别一次地址转换成功、页错误或无页表遍历。
+
+Case 1：源码有独立 RISC-V 地址转换函数，解释它如何根据 satp、VPN、PTE、权限计算 PA。
+
+Case 2：TLB 命中不经过该函数，明确应在其他路径观察，避免用“断点没触发”证明没有 TLB。
+
+Case 3：实际 QEMU 版本与指导书示例不同，依据当前源码重建路径，不强行套用 QEMU 4.1.1 的文件结构。
+
+Requirements：输出代码依据，区分已静态确认和需要运行确认的结论；禁止新增冗余日志、永久断点或模拟器补丁。
+```
