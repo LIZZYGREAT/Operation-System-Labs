@@ -139,9 +139,40 @@ B2 在 `kern/mm/pmm.c` 的 `init_pmm_manager()` 中将管理器注册为 `best_f
 
 实现过程按照“阅读 First-Fit 与固定测试 → 明确接口和状态不变量 → 编写 Best-Fit Spec → 完成 B1 实现 → 审查数据结构变化 → 完成 B2 接入与验收”的顺序推进。提示词将允许修改的文件、接口职责、选择规则、拆分合并行为和验收命令分别写明，完整记录见 `report/prompt.md`。
 
+#### 实现迭代过程
+
+##### 第一次迭代：B1 实现与独立审查
+
+实现集中在 `kern/mm/best_fit_pmm.c` 的原占位区域，保留 `//lab2 function2-2 2412700` 标记。Git 历史包含 `74e5381` 和 `e7bde35` 中的 Best-Fit 实现；从初始版本到当前 HEAD 的 Best-Fit 文件差异位于实现区域，固定测试区域保持不变。
+
+独立 harness 的一次检查曾因手工填写的总页数期望值错误而失败。定位后修正的是临时 harness 的期望值，生产分配器代码未因此修改；记录的重跑结果通过。没有发现或修复 Best-Fit 生产代码 Bug。B1 审查阶段的完整构建曾因当时 A 的 `page_init()` 尚未实现而受阻，之后 A 的实现进入分支，B2 基线构建通过。
+
+##### 第二次迭代：B2 接入与运行验收
+
+default First-Fit 基线构建和启动自检通过后，`pmm.c` 的 `init_pmm_manager()` 已将管理器指针切换为 `best_fit_pmm_manager`，并保留既有初始化和打印逻辑。该注册切换已随提交 `585b259`（`feat(lab2): integrate and document Best-Fit allocator`）进入当前分支历史。Best-Fit 构建、QEMU 自检和自动评分结果见下方 B2 验收记录。
+
 ---
 
 ## 五、测试与验证
+
+<!-- 根据该实验的具体情况，提供完整的测试运行截图，应包含：
+- 编译及运行成功的输出（make qemu），可能有多个
+- 测试通过的结果（make grade），只有一个
+-->
+
+### A 线：物理内存初始化阶段验证
+
+以下阶段性结果及截图保留自 `2ada293` 的小组报告，负责人为 2413318-向宇航。基线构建截图显示，未完成的 Best-Fit 实现因 `free_list`、`nr_free` 未声明而编译失败：
+
+![Best-Fit 尚未完成时的基线构建错误](./images/baseline.png)
+
+完成 `page_init()` 并补齐 Best-Fit 模块后，`make qemu` 成功启动，初始化时仍注册 `default_pmm_manager`，并输出物理内存范围、页描述符范围和 `check_alloc_page() succeeded!`：
+
+![物理内存初始化后的 QEMU 输出](./images/init.png)
+
+该阶段的 `make grade` 截图显示 Page Init 为 `OK`，Best-Fit 为 `WRONG`，总分 `10/20`。这是 Best-Fit 接入验收前的中间结果；后续 B2 的最终评分见下表，为 `20/20`：
+
+![阶段性 make grade 结果](./images/init_check.png)
 
 ### B1：Best-Fit 分配器验证
 
@@ -169,11 +200,14 @@ timeout --foreground --signal=INT --kill-after=2s 8s make -C code qemu
 make -C code grade
 ```
 
-| 验证阶段 | 关键结果 |
-|----------|----------|
-| First-Fit 基线 | 内核完成物理内存初始化，输出 `memory management: default_pmm_manager` 和 `check_alloc_page() succeeded!`。 |
-| Best-Fit 集成 | 内核选择 `best_fit_pmm_manager`，正确识别 128 MB 物理内存，登记 31929 个空闲页，并完成分配器自检。 |
-| 自动评分 | `[Test 1] Page Init: PASS`、`[Test 2] Best-Fit: PASS`，最终成绩 `20/20`。 |
+| 阶段 | 运行命令/方式 | 关键输出与结果 |
+|------|----------|----------------|
+| default First-Fit 基线 | `make`；`timeout --foreground --signal=INT --kill-after=2s 6s make qemu` | `make` 退出 0。QEMU 输出 `memory management: default_pmm_manager`、空闲页区间及 `check_alloc_page() succeeded!`。QEMU 以 124 结束，是内核进入空闲循环后由超时安全停止。 |
+| Best-Fit 集成 | `make`；`timeout --foreground --signal=INT --kill-after=2s 8s make qemu` | `make` 退出 0。QEMU 输出 `memory management: best_fit_pmm_manager`、登记 31929 个空闲页及 `check_alloc_page() succeeded!`；后一句出现在 `pmm_manager->check()` 返回之后，表明固定 `best_fit_check()` 未触发断言。QEMU 以 124 安全停止。 |
+| 自动评分 | `make grade` | 退出 0；评分输出两项 `OK`，并以 `Total Score: 20/20` 结束。 |
+| 显示评分串口行 | 在临时副本运行 `tools/inject.py` 和 `make`，再启动 QEMU 并将串口输出接到标准输出；完整 shell 命令和临时路径未留存 | 实际输出 `[Test 1] Page Init: PASS`、`[Test 2] Best-Fit: PASS`。有界 QEMU 退出码 124，停止原因同上。 |
+
+`make grade` 将评分用副本和串口文件放在 `/tmp/lab2_grade`，评分后清理该目录；因此评分终端显示 `OK`，不直接显示串口 PASS 行。PASS 行另由上表所述的临时副本串口运行核对。
 
 QEMU 启动截图显示内核已选择 `best_fit_pmm_manager`，物理页初始化完成，且 `check_alloc_page()` 自检通过。
 

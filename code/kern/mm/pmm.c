@@ -61,8 +61,7 @@ size_t nr_free_pages(void) {
     return pmm_manager->nr_free_pages();
 }
 
-//lab2 function1 YOUR CODE
-//2413318-向宇航
+//lab2 function1 2413318
 static void page_init(void) {
     extern char end[];
     uint64_t memory_base = get_memory_base();
