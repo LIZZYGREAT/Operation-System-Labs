@@ -31,26 +31,6 @@ if (p != NULL) {
 
 初始区域可分解为多个符合对齐的块，支持非二次幂长度和多次登记互不重叠的区域。管理器 `init()` 早于 `page_init()`，因此最大阶由框架支持范围推导，不依赖当时尚未建立的描述符数组。本实现面向单 hart 串行调用。
 
-## QEMU 4.1.1 安装记录
-
-首次安装阶段记录的环境为 WSL Ubuntu 26.04，宿主 GCC 15.2.0，内核交叉编译器为 RISC-V GCC 15.1.0。本次独立测试实际调用的交叉编译器版本见下文及环境日志。
-
-从指导书指定的 `https://download.qemu.org/qemu-4.1.1.tar.xz` 获取官方发布源码，保留原源码，执行了以下配置、编译和用户目录安装：
-
-```bash
-mkdir -p ~/build/qemu-4.1.1
-cd ~/build/qemu-4.1.1
-~/src/qemu-4.1.1/configure \
-    --prefix="$HOME/.local/opt/qemu-4.1.1" \
-    --target-list=riscv32-softmmu,riscv64-softmmu \
-    --enable-debug --disable-werror
-make -j8
-make install
-```
-
-`--disable-werror` 用于允许旧版 QEMU 在现代宿主工具链上的警告；实验内核自己的 `-Werror` 保持不变。实际安装的两个 RISC-V 模拟器均输出 `QEMU emulator version 4.1.1`，64 位模拟器包含调试信息且未剥离符号。构建与安装日志位于 WSL 的 `~/build/qemu-4.1.1/`。
-
-本机 64 位程序路径为 `/home/catalpa/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64`。系统原有其他 QEMU 版本保持原状；运行实验时必须显式指定本版本，或在当前终端调整 `PATH`。不要把本机绝对路径写死到全组 Makefile。
 
 ## 运行与切换
 
@@ -99,11 +79,7 @@ make grade PMM=best_fit QEMU="$QEMU411"
 | 非法 `PMM=invalid` | 构建阶段按预期拒绝 |
 | 受保护源文件与差异检查 | 原有算法、启动代码和固定测试未修改；`git diff --check` 通过 |
 
-启动自检的回归记录统一保存在 [buddy_tests](buddy_tests/)：
-
-- [Buddy](buddy_tests/regression_buddy.log)
-- [Best-Fit](buddy_tests/regression_best_fit.log)
-- [默认 First-Fit](buddy_tests/regression_default.log)
+启动自检回归覆盖 Buddy、Best-Fit 和默认 First-Fit。旧日志不再随仓库保存；运行下文测试脚本可在 `report/buddy_tests/` 重新生成日志。
 
 基础自检在两轮申请/释放中检查单页、申请 3 页实际占用 4 页、块不重叠、回收复用，以及各阶块的对齐、首页标记、链表和空闲计数一致性；另检查超大请求失败且不改变空闲计数。
 
@@ -117,7 +93,7 @@ WSL 首次从官网下载时出现 TLS 连接错误，随后通过 Windows 下�
 
 ## 第二份提示词：独立测试结果（2026-10-21）
 
-实际使用 QEMU 4.1.1、默认 OpenSBI 0.4、RISC-V GCC 14.2.0。已执行的构建命令、串口输出及汇总均保存在 [buddy_tests](buddy_tests/)；其中 [environment.log](buddy_tests/environment.log) 记录实际版本，[summary.log](buddy_tests/summary.log) 记录脚本核对结果。
+实际使用 QEMU 4.1.1、默认 OpenSBI 0.4、RISC-V GCC 14.2.0。下文保留本次结果摘要；重新运行脚本后，`report/buddy_tests/environment.log` 记录运行环境，`summary.log` 记录核对结果，其余日志记录构建和串口输出。
 
 ### 测试隔离与判断方法
 
@@ -138,7 +114,7 @@ WSL 首次从官网下载时出现 TLS 连接错误，随后通过 Windows 下�
 | `failure_preserves_state` | 空状态、耗尽、超容量、最大整数及高位请求均失败；8 个孤立空闲页不能满足 2 页请求，但仍可逐页分配并完整回收，检查失败路径未破坏状态 | PASS |
 | `reuse_16_rounds` | 16 轮混合请求，按不同排列释放，每轮重新申请完整 64 页，检查泄漏、重复入链和合并遗漏 | PASS |
 
-正常启动的 [normal.log](buddy_tests/normal.log) 输出了八个 PASS，随后输出：
+本次正常启动输出了八个 PASS，随后输出：
 
 ```text
 [Buddy test] ALL PASS; fixture restored; continuing real page_init
@@ -162,7 +138,7 @@ check_alloc_page() succeeded!
 | 5 | 重复登记已接管的页面 | `PageReserved(base + i)` | 符合预期 |
 | 6 | 从第 60 页开始登记 8 页，超出 64 页范围 | `n <= npage - nbase - index` | 符合预期 |
 
-对应输出见 `buddy_tests/invalid_1.log` 至 `invalid_6.log`。这些 panic 是明确设计的拒绝非法调用行为，不能与正常用例应无 panic 的要求混淆。
+重新运行脚本会生成 `report/buddy_tests/invalid_1.log` 至 `invalid_6.log`。这些 panic 是明确设计的拒绝非法调用行为，不能与正常用例应无 panic 的要求混淆。
 
 ### 复现命令
 

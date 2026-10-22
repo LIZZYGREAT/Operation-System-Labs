@@ -257,7 +257,7 @@ bash tools/run_buddy_tests.sh \
     "$HOME/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64"
 ```
 
-关闭独立测试后，Buddy 的启动自检通过；4 种非法测试构建配置均被拒绝。本次验证使用单 hart，执行记录见 [验证日志](./buddy_tests/summary.log) 及 [完整日志目录](./buddy_tests/)。
+关闭独立测试后，Buddy 的启动自检通过；4 种非法测试构建配置均被拒绝。本次验证使用单 hart，结果摘要见 [Buddy 使用说明](./buddy_usage.md)。旧日志不再随仓库保存；重新运行上述脚本可在 `report/buddy_tests/` 生成完整日志与 `summary.log`。
 
 ![图 C4：Buddy 测试脚本执行结果](./images/c4.png)
 
