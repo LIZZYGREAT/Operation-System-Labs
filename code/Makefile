@@ -35,12 +35,14 @@ CFLAGS	+= -fno-builtin -Wall -O2 -nostdinc $(DEFS)
 CFLAGS	+= -fno-stack-protector -ffunction-sections -fdata-sections
 CFLAGS	+= -g
 # lab2 allocator selection - 2412712. Clean before changing PMM.
-PMM ?= first_fit
+PMM ?= best_fit
 ifeq ($(PMM),buddy)
 CFLAGS += -DPMM_USE_BUDDY
 else ifeq ($(PMM),best_fit)
 CFLAGS += -DPMM_USE_BEST_FIT
-else ifneq ($(PMM),first_fit)
+else ifeq ($(PMM),first_fit)
+CFLAGS += -DPMM_USE_FIRST_FIT
+else
 $(error Invalid PMM '$(PMM)': use first_fit, best_fit, or buddy)
 endif
 # lab2 independent Buddy tests - 2412712. Case 0 is the normal suite.

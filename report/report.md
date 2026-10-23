@@ -172,6 +172,8 @@ B2 在 `kern/mm/pmm.c` 的 `init_pmm_manager()` 中将管理器注册为 `best_f
 
 default First-Fit 基线构建和启动自检通过后，`pmm.c` 的 `init_pmm_manager()` 已将管理器指针切换为 `best_fit_pmm_manager`，并保留既有初始化和打印逻辑。该注册切换已随提交 `585b259`（`feat(lab2): integrate and document Best-Fit allocator`）进入当前分支历史。Best-Fit 构建、QEMU 自检和自动评分结果见下方 B2 验收记录。
 
+2026-10-23 合并同步：merge 提交 `c86c559` 保留编译期选择，顺序为 Buddy → 显式 First-Fit → 默认 Best-Fit。配套 Makefile 默认 `PMM=best_fit`，`PMM=first_fit` 定义 `PMM_USE_FIRST_FIT`；显式选择 Buddy、Best-Fit 分别使用 `PMM=buddy`、`PMM=best_fit`。切换配置前执行 `make clean`。下方 B2 结果保留为原阶段验收记录。
+
 ### 功能模块：Buddy System 物理页分配（功能模块二 · 任务三）
 
 **负责人：** 2412712-王子楸
@@ -462,6 +464,8 @@ flowchart LR
 
 ### C 线：Buddy System 分配器验证
 
+以下截图及页数为 2026-10-21 合并前的阶段性验证记录。合并同步后的复测单独记录于 [Buddy 使用说明](./buddy_usage.md)，不以历史页数断言当前结果。
+
 **负责人：** 2412712-王子楸
 
 在 WSL 中使用 QEMU 4.1.1，以 `PMM=buddy BUDDY_TEST=1` 启用 Buddy 及独立测试，编译、链接成功。
@@ -494,9 +498,11 @@ bash tools/run_buddy_tests.sh \
     "$HOME/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64"
 ```
 
-关闭独立测试后，Buddy 的启动自检通过；4 种非法测试构建配置均被拒绝。本次验证使用单 hart，结果摘要见 [Buddy 使用说明](./buddy_usage.md)。旧日志不再随仓库保存；重新运行上述脚本可在 `report/buddy_tests/` 生成完整日志与 `summary.log`。
+上述阶段关闭独立测试后，Buddy 的启动自检通过；4 种非法测试构建配置均被拒绝。当前脚本另覆盖显式 First-Fit、显式 Best-Fit 和不传 `PMM` 参数的默认 Best-Fit，逐项核对管理器名称与公共自检输出，默认构建回归放在最后并在成功结束后保留。本次验证使用单 hart，结果摘要见 [Buddy 使用说明](./buddy_usage.md)。旧日志不再随仓库保存；重新运行上述脚本可在 `report/buddy_tests/` 生成完整日志与 `summary.log`。
 
 ![图 C4：Buddy 测试脚本执行结果](./images/c4.png)
+
+2026-10-23 合并同步复测：使用 QEMU 4.1.1、RISC-V GCC 10.2.0 运行完整脚本，退出码为 0。八个正常场景、六个非法调用、四种后端回归和四个非法配置检查全部符合预期；默认及显式 Best-Fit 输出 `best_fit_pmm_manager`，显式 First-Fit 输出 `default_pmm_manager`，Buddy 输出 `buddy_pmm_manager`，各正常启动均通过公共自检。脚本成功结束后保留默认 Best-Fit 构建；本次未运行 `make grade`。
 
 
 ---

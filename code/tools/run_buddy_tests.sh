@@ -73,13 +73,13 @@ for case_id in 1 2 3 4 5 6; do
     pass "invalid_$case_id: $name triggered the expected allocator assertion"
 done
 
-for backend in buddy best_fit default; do
+for backend in buddy first_fit best_fit default; do
     run_config "regression_$backend" "$backend" 0 0
     log="$log_dir/regression_${backend}.log"
     case "$backend" in
         buddy) manager=buddy_pmm_manager ;;
-        best_fit) manager=best_fit_pmm_manager ;;
-        default) manager=default_pmm_manager ;;
+        first_fit) manager=default_pmm_manager ;;
+        best_fit|default) manager=best_fit_pmm_manager ;;
     esac
     grep -Fq "memory management: $manager" "$log"
     grep -Fq 'check_alloc_page() succeeded!' "$log"
@@ -103,5 +103,5 @@ reject_config reject_backend 'BUDDY_TEST=1 requires PMM=buddy' PMM=best_fit BUDD
 reject_config reject_case 'Invalid BUDDY_TEST_CASE' PMM=buddy BUDDY_TEST=1 BUDDY_TEST_CASE=7
 reject_config reject_flag 'Invalid BUDDY_TEST' PMM=buddy BUDDY_TEST=2
 reject_config reject_disabled_case 'BUDDY_TEST_CASE requires BUDDY_TEST=1' BUDDY_TEST_CASE=1
-printf 'ALL VALIDATION PASSED; default First-Fit build restored.\n' \
+printf 'ALL VALIDATION PASSED; default Best-Fit build restored.\n' \
     | tee -a "$log_dir/summary.log"
