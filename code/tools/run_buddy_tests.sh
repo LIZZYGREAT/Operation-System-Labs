@@ -28,8 +28,24 @@ run_config() {
     fi
     make clean >"$log_dir/${label}_build.log" 2>&1
     make -j2 "${args[@]}" >>"$log_dir/${label}_build.log" 2>&1
-    # Ctrl+A, X requests a normal QEMU exit. Timeout is a failure guard only.
-    (sleep 2; printf '\001x') | timeout 15s make --no-print-directory qemu \
+    local marker='check_alloc_page() succeeded!'
+    if ((case_id > 0)); then
+        marker="assertion failed: ${conditions[case_id-1]}"
+    fi
+    : >"$log_dir/${label}.raw"
+    # Wait for the result before Ctrl+A, X; timeout remains a failure guard.
+    (
+        deadline=$((SECONDS + 15))
+        while ((SECONDS < deadline)); do
+            if grep -Fq "$marker" "$log_dir/${label}.raw" 2>/dev/null; then
+                sleep 0.1
+                printf '\001x'
+                exit 0
+            fi
+            sleep 0.1
+        done
+        exit 1
+    ) | timeout 15s make --no-print-directory qemu \
         "${args[@]}" QEMU="$qemu" >"$log_dir/${label}.raw" 2>&1
     tr -d '\r' <"$log_dir/${label}.raw" | sed '${/^$/d;}' >"$log_dir/${label}.log"
     rm -f "$log_dir/${label}.raw"
