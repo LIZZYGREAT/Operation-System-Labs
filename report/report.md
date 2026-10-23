@@ -450,15 +450,13 @@ flowchart LR
 
 原始写入地址在页内的偏移为 `0xff8`，该偏移在转换前后保持不变，因此实际访问的字节物理地址为 `0x80204000 + 0xff8 = 0x80204ff8`。这次跟踪由此形成完整链路：Bare 模式直接访问内核入口，启用 Sv39 后进入高虚拟地址，再由 `kern_init` 的栈写入触发页表查找，最终把页级映射写入 QEMU 软件 TLB。后续访问同一虚拟页时可以复用该映射，只需保留各自的页内偏移。
 
-### C 线：Buddy System 分配器验证
-
-以下截图及页数为 2026-10-21 合并前的阶段性验证记录。合并同步后的复测单独记录于 [Buddy 使用说明](./buddy_usage.md)，不以历史页数断言当前结果。
+### C1：Buddy 实现与测试设计
 
 **负责人：** 2412712-王子楸
 
-在 WSL 中使用 QEMU 4.1.1，以 `PMM=buddy BUDDY_TEST=1` 启用 Buddy 及独立测试，编译、链接成功。
+本任务负责实现 Buddy 分配器，并设计验证其正确性的测试；独立启动与实际运行结果列于 C2。
 
-![图 C1：Buddy 测试环境与编译结果](./images/c1.png)
+[buddy_pmm.c](../code/kern/mm/buddy_pmm.c) 实现 `buddy_init()`、`buddy_init_memmap()`、`buddy_alloc_pages()`、`buddy_free_pages()`、`buddy_nr_free_pages()` 和 `buddy_check()`，通过 `buddy_pmm_manager` 接入现有 PMM 框架。实现按阶管理空闲块，申请时向上取整并拆分，释放时按绝对物理页号 XOR 查找同阶伙伴并合并，同时维护页面标记与空闲计数。接口及实现过程见第四节“Buddy System 物理页分配”。
 
 [buddy_test.c](../code/kern/mm/buddy_test.c) 使用 64 个静态页描述符构造受控状态，由独立逐页归属表核对分配区不重叠、块对齐、页面标记和空闲计数。正常测试覆盖如下。
 
@@ -470,13 +468,27 @@ flowchart LR
 | 分配失败 | 空状态、耗尽、超大请求及碎片化状态下返回失败，管理状态保持有效 |
 | 重复使用 | 进行 16 轮混合申请与不同顺序释放，每轮均可重新申请完整区域 |
 
+正常用例共 8 个场景，每次操作均与独立模型核对。非法调用另设零页申请、重复释放、错误释放长度、内部页释放、重复登记和越界登记 6 个用例；每个用例独立启动，只在预期位置触发对应断言时判为符合预期。
+
+分配器与测试源码的编译、链接结果见下图，其中包括 `buddy_pmm.c`、`buddy_test.c` 及最终内核镜像生成。
+
+![Buddy 分配器与测试源码编译结果](./images/c1.png)
+
+### C2：单独启动 Buddy 并测试
+
+**负责人：** 2412712-王子楸
+
+本任务在可用的物理内存初始化基础上，显式选择 Buddy 后端并单独启动，验证 C1 实现和测试的实际行为。详细说明见 [Buddy 使用说明](./buddy_usage.md)。
+
+在 WSL 中使用 QEMU 4.1.1，以 `PMM=buddy BUDDY_TEST=1` 显式启用 Buddy 及独立测试。运行输出 `memory management: buddy_pmm_manager`，确认实际选用了 Buddy 后端。
+
 8 个正常场景均通过。测试结束后恢复全局状态，继续真实 `page_init()` 和 `buddy_check()`，基础自检前后空闲页数均为 31926。
 
-![图 C2：正常测试与真实内存自检结果](./images/c2.png)
+![Buddy 正常测试与真实内存自检结果](./images/c2.png)
 
-非法调用测试包括零页申请、重复释放、错误释放长度、内部页释放、重复登记和越界登记。6 个用例分别启动 QEMU，均在预期位置触发断言；超时或其他位置的崩溃不计为通过。下图为错误释放长度的验证结果。
+6 个非法调用用例分别启动 QEMU，均在预期位置触发断言；超时或其他位置的崩溃不计为通过。下图为错误释放长度的验证结果。
 
-![图 C3：错误释放长度的断言验证](./images/c3.png)
+![Buddy 错误释放长度的断言验证](./images/c3.png)
 
 在仓库根目录执行以下命令，可运行本线测试并保存日志：
 
@@ -488,9 +500,28 @@ bash tools/run_buddy_tests.sh \
 
 上述阶段关闭独立测试后，Buddy 的启动自检通过；4 种非法测试构建配置均被拒绝。当前脚本另覆盖显式 First-Fit、显式 Best-Fit 和不传 `PMM` 参数的默认 Best-Fit，逐项核对管理器名称与公共自检输出，默认构建回归放在最后并在成功结束后保留。本次验证使用单 hart，结果摘要见 [Buddy 使用说明](./buddy_usage.md)。旧日志不再随仓库保存；重新运行上述脚本可在 `report/buddy_tests/` 生成完整日志与 `summary.log`。
 
-![图 C4：Buddy 测试脚本执行结果](./images/c4.png)
+![Buddy 合并前测试脚本执行结果（默认 First-Fit）](./images/c4.png)
 
-2026-10-23 合并同步复测：使用 QEMU 4.1.1、RISC-V GCC 10.2.0 运行完整脚本，退出码为 0。八个正常场景、六个非法调用、四种后端回归和四个非法配置检查全部符合预期；默认及显式 Best-Fit 输出 `best_fit_pmm_manager`，显式 First-Fit 输出 `default_pmm_manager`，Buddy 输出 `buddy_pmm_manager`，各正常启动均通过公共自检。脚本成功结束后保留默认 Best-Fit 构建；本次未运行 `make grade`。
+合并同步复测：使用 QEMU 4.1.1、RISC-V GCC 10.2.0 运行完整脚本，退出码为 0。八个正常场景、六个非法调用、四种后端回归和四个非法配置检查全部符合预期；默认及显式 Best-Fit 输出 `best_fit_pmm_manager`，显式 First-Fit 输出 `default_pmm_manager`，Buddy 输出 `buddy_pmm_manager`，各正常启动均通过公共自检。脚本成功结束后保留默认 Best-Fit 构建；本次未运行 `make grade`。
+
+### C3：SLUB 独立复核
+
+**负责人：** 2412712-王子楸
+
+本任务复核 A3 的 SLUB 实现，并独立编译运行现有测试。源码检查覆盖类别选择、16 字节对齐、大小溢出、空闲链表维护及页面回收，在单核串行、合法原始指针的接口约定内未发现实现缺陷。
+
+在 `lab2` 提交 `02f14ca` 上复测，使用 WSL Ubuntu、QEMU 4.1.1、RISC-V GCC 15.1.0，配置为 128 MiB、单 hart、Best-Fit。清理旧产物后，以 `PMM=best_fit DEFS=-DSLUB_TEST=1` 编译，使用独立目录 `obj/slub-test`、`bin/slub-test`，编译、链接及镜像生成成功。
+
+![SLUB 复核环境与独立编译结果](./images/c5.png)
+
+运行输出 `memory management: best_fit_pmm_manager`，原有 PMM 自检通过。零大小与 NULL、类别边界、对象隔离、释放复用、多 slab、即时回收、大对象、失败与耗尽、384 轮混合操作共九组测试均输出 PASS。耗尽场景实际临时占用 31859 页；最终输出 `ALL 9 CASES PASSED: baseline=31862 final=31862`，测试结束后空闲页数完整恢复。
+
+![SLUB 九组测试及页面回收结果](./images/c6.png)
+
+关闭 `SLUB_TEST` 后重新清理、编译并启动，内核仍选择 Best-Fit，输出 `check_alloc_page() succeeded!`，未出现 SLUB 测试输出。此时空闲页数为 31929，与测试版的差异来自内核代码和静态测试数据占用。内核初始化后继续循环，图中的 signal 15 由预设超时结束 QEMU 触发。
+
+![关闭 SLUB 测试后的启动回归结果](./images/c7.png)
+
 
 ### A3：Buddy System 验证
 
@@ -504,7 +535,7 @@ bash tools/run_buddy_tests.sh \
 
 ![Buddy System 编译验证](./images/buddy_check_compile.png)
 
-![Buddy System 运行程序验证](./images/buddy_check_run.png)
+![Buddy System 运行程序验证](./images/buddy_check_test.png)
 
 ---
 
