@@ -40,13 +40,13 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    // lab2 allocator selection - 2412712; preserve First-Fit as the default.
+// choose a pmm_manager instance according to the compile-time configuration
 #if defined(PMM_USE_BUDDY)
     pmm_manager = &buddy_pmm_manager;
-#elif defined(PMM_USE_BEST_FIT)
-    pmm_manager = &best_fit_pmm_manager;
-#else
+#elif defined(PMM_USE_FIRST_FIT)
     pmm_manager = &default_pmm_manager;
+#else
+    pmm_manager = &best_fit_pmm_manager;
 #endif
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
@@ -74,8 +74,7 @@ size_t nr_free_pages(void) {
     return pmm_manager->nr_free_pages();
 }
 
-//lab2 function1 YOUR CODE
-//2413318-向宇航
+//lab2 function1 2413318
 static void page_init(void) {
     extern char end[];
     uint64_t memory_base = get_memory_base();
