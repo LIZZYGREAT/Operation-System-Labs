@@ -14,8 +14,8 @@
 
 | 成员 | 负责的练习/模块 |
 |------|----------------|
-| 2412700-甘文杰 | 实现 Best-Fit 连续物理内存分配算法 |
-| 2412712-王子楸 | [练习或模块名称] |
+| 2412700-甘文杰 | 实现 Best-Fit 连续物理内存分配算法，双GDB调试与交叉验证 |
+| 2412712-王子楸 | Buddy System 分配器的设计、实现、接入与独立测试 |
 | 2413318-向宇航 | 实现物理内存探测与页描述符初始化功能 |
 
 实验报告如何分工？
@@ -38,8 +38,8 @@
 
 | 成员 | AI 编程工具 | 底层模型 | 备注 |
 |------|------------|---------|------|
-| 甘文杰 | Codex | GPT-6.0-Luna | 无 |
-| 学号2-姓名2 | | | |
+| 2412700-甘文杰 | Codex | GPT-6.0-Luna | 无 |
+| 2412712-王子楸 | Codex | GPT-6.1 Sol High | 无 |
 | 2413318-向宇航 | Codex | GPT-6.1 Sol Light | 无 |
 
 **说明：**
@@ -93,7 +93,7 @@ flowchart TD
 
 ## 四、实验内容与实现
 
-### B1/B2：Best-Fit 连续物理页分配器
+### 功能模块：实现 Best-Fit 连续物理内存分配算法（功能模块二 · 任务三）
 
 **负责人：** 2412700-甘文杰
 
@@ -102,6 +102,8 @@ flowchart TD
 B1 的目标是在 `kern/mm/best_fit_pmm.c` 中实现完整的 Best-Fit 连续物理页分配器，B2 则将该分配器接入内核的 PMM 框架。内存探测和页描述符初始化由 `page_init()` 完成；Best-Fit 接收已经登记的可用页区间，负责后续的连续页分配、回收和空闲块维护。
 
 PMM 的初始化顺序为：`pmm_init()` → `init_pmm_manager()` → `best_fit_init()` → `page_init()` → `best_fit_init_memmap()` → `best_fit_check()`。初始化完成后，`alloc_pages()`、`free_pages()` 和 `nr_free_pages()` 通过 `struct pmm_manager` 中的函数指针调用 Best-Fit 实现。
+
+B2 阶段通过 `pmm.c` 注册为当前 `pmm_manager`。实现复用 `struct Page` 和地址有序双向链表：`best_fit_init()` 建立空闲链表并清零计数；`best_fit_init_memmap()` 将初始连续页登记为空闲块；`best_fit_alloc_pages(n)` 从所有满足请求的空闲块中选页数最少者，必要时拆分余块；`best_fit_free_pages()` 按地址插入释放块并合并紧邻的左右块；`best_fit_nr_free_pages()` 返回空闲页数。
 
 #### 数据结构与状态维护
 
@@ -131,6 +133,16 @@ Best-Fit 与 First-Fit 使用相同的数据结构和回收逻辑，区别集中
 
 一次分配的状态变化可以概括为“选择、摘除、拆分、计数”四步：先找出最合适的空闲块，将其从链表中移除；若块大小超过请求页数，就从分配区间之后建立新的空闲块；最后清除已分配块首项的空闲标志，并从 `nr_free` 中扣除实际分配的页数。释放过程与之相反，先恢复页描述符并按地址插回链表，再检查左右相邻块是否连续。地址有序既保证了相同大小时选择结果稳定，也使释放时能够直接判断相邻块并完成合并。
 
+#### 完成结果
+
+已有验收记录显示，Best-Fit 构建退出码为 `0`；限时 QEMU 运行到 `check_alloc_page() succeeded!` 后因内核进入循环而由 `timeout` 停止，退出码 `124` 属预期停止结果；`make -C code grade` 退出码为 `0`，Page Init 与 Best-Fit 均为 `OK`，总分 `20/20`。其中内核的 `best_fit_check()` 检查分配算法行为，评分中的 Best-Fit 项确认管理器注册。
+
+**思考题：你的 Best-Fit 算法是否有进一步的改进空间？**
+
+有。当前空闲块按地址保存在链表中，若有 `k` 个空闲块，分配时需要扫描全部候选以找到最小的合适块，时间复杂度为 `O(k)`；释放时为保持地址顺序查找插入位置也需要 `O(k)`。可以增加按块大小组织的平衡树，以 `(块大小, 地址)` 为键，将 Best-Fit 候选查找降至约 `O(log k)`。但只按大小排序会削弱相邻物理块的快速定位能力；要兼顾释放合并，通常需要同时维护地址索引和大小索引，并在分配、拆分、释放、合并时同步更新，复杂度和出错风险也会增加。
+
+Best-Fit 也不保证所有请求序列下都能减少碎片，它可能留下许多无法满足较大连续请求的小块。改进效果应通过相同的分配/释放轨迹比较扫描步数、空闲块数、最大连续块和总空闲页数来评估。
+
 #### 内核接入
 
 B2 在 `kern/mm/pmm.c` 的 `init_pmm_manager()` 中将管理器注册为 `best_fit_pmm_manager`。内核启动后，`page_init()` 通过统一接口登记可用内存，`check_alloc_page()` 再调用管理器的 `check` 回调执行 `best_fit_check()`，由此完成从内存初始化到算法自检的完整调用链。
@@ -150,6 +162,86 @@ B2 在 `kern/mm/pmm.c` 的 `init_pmm_manager()` 中将管理器注册为 `best_f
 ##### 第二次迭代：B2 接入与运行验收
 
 default First-Fit 基线构建和启动自检通过后，`pmm.c` 的 `init_pmm_manager()` 已将管理器指针切换为 `best_fit_pmm_manager`，并保留既有初始化和打印逻辑。该注册切换已随提交 `585b259`（`feat(lab2): integrate and document Best-Fit allocator`）进入当前分支历史。Best-Fit 构建、QEMU 自检和自动评分结果见下方 B2 验收记录。
+
+### 功能模块：Buddy System 物理页分配（功能模块二 · 任务三）
+
+**负责人：** 2412712-王子楸
+
+#### 模块功能描述
+
+**需要实现/修改的函数：**
+
+```c
+// kern/mm/buddy_pmm.c：分配器回调与注册对象
+static void buddy_init(void);
+static void buddy_init_memmap(struct Page *base, size_t n);
+static struct Page *buddy_alloc_pages(size_t n);
+static void buddy_free_pages(struct Page *base, size_t n);
+static size_t buddy_nr_free_pages(void);
+static void buddy_check(void);
+const struct pmm_manager buddy_pmm_manager;
+
+// kern/mm/buddy_test.c：独立测试入口与用例
+void buddy_test_all(void);
+static void test_init_memmap(void);
+static void test_split_merge(void);
+static void test_rounding(void);
+static void test_failure(void);
+static void test_reuse(void);
+static void test_invalid_request(unsigned int case_id);
+
+// kern/mm/pmm.c：管理器选择与条件测试接入
+static void init_pmm_manager(void);
+void pmm_init(void);
+```
+
+**功能说明：**
+
+`page_init()` 确定可用页范围，Buddy 将其组织为各阶空闲块：`buddy_init()` 准备管理结构，`buddy_init_memmap()` 登记页面，`buddy_alloc_pages()` 按请求选择并拆分块，`buddy_free_pages()` 校验参数后回收并合并真正伙伴，`buddy_nr_free_pages()` 提供空闲页统计。模块通过现有 `pmm_manager` 接口接入，不改变其他成员的物理内存初始化逻辑。
+
+模块处理非对齐初始区间、非二次幂请求、空间不足及非法释放。`buddy_check()` 用于实际内存初始化后的基础检查；独立测试由 `buddy_test_all()` 统一调度。相关文件为 [buddy_pmm.c](../code/kern/mm/buddy_pmm.c)、[buddy_test.c](../code/kern/mm/buddy_test.c) 及其头文件。
+
+#### 最终提示词
+
+两份最终提示词全文见 [prompt.md](./prompt.md) 的“任务三：Buddy System”部分：第一份用于生成分配器并接入内核，第二份用于针对该实现设计独立测试。
+
+#### 实现迭代过程
+
+本模块按“生成分配器并接入、补充独立测试”两个阶段推进，分别记录如下。
+
+---
+
+##### 第一次迭代：分配器实现与接入
+
+**遇到的问题：**
+
+初次验证调用了环境中默认的 QEMU 7.0.0，原启动流程出现异常，未能完成内存检查。核对指导书后，确认实验应使用 QEMU 4.1.1。
+
+**问题解决策略：**
+
+安装课程指定版本，在运行命令中显式指定其路径；删除排错时新增的临时兼容文件，按原启动方式重新验证。本次调整集中在运行环境，分配器算法主体未改写。
+
+**最终结果：**
+
+- 分配模块及管理器注册结构编译通过。
+- 能通过 `PMM=buddy` 选择该管理器并正常启动。
+- 在规定版本下通过基础自检，完成第一阶段交付。
+
+---
+
+##### 第二次迭代：独立测试与回归验证
+
+依据第二份提示词增加测试代码、条件入口和运行脚本。测试代码首次编译、执行通过，未发现需要修复的算法错误。
+
+**最终结果：**
+
+- 独立测试能够编译运行，正常用例及非法调用均符合预期。
+- 测试完成后能够恢复环境，并继续内核初始化。
+- 关闭扩展测试后，原有分配器的启动检查通过；具体覆盖、输出和截图统一见第五部分。
+
+**关键改进点总结：**
+
+验证由分配器自身的基础检查扩展为独立预期模型和明确的非法调用判据，使生成代码的行为可以逐项核查。
 
 ---
 
