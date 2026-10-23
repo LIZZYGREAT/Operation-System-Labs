@@ -34,6 +34,36 @@ CFLAGS  := -mcmodel=medany -std=gnu99 -Wno-unused -Werror
 CFLAGS	+= -fno-builtin -Wall -O2 -nostdinc $(DEFS)
 CFLAGS	+= -fno-stack-protector -ffunction-sections -fdata-sections
 CFLAGS	+= -g
+# lab2 allocator selection - 2412712. Clean before changing PMM.
+PMM ?= best_fit
+ifeq ($(PMM),buddy)
+CFLAGS += -DPMM_USE_BUDDY
+else ifeq ($(PMM),best_fit)
+CFLAGS += -DPMM_USE_BEST_FIT
+else ifeq ($(PMM),first_fit)
+CFLAGS += -DPMM_USE_FIRST_FIT
+else
+$(error Invalid PMM '$(PMM)': use first_fit, best_fit, or buddy)
+endif
+# lab2 independent Buddy tests - 2412712. Case 0 is the normal suite.
+BUDDY_TEST ?= 0
+BUDDY_TEST_CASE ?= 0
+ifneq ($(words $(BUDDY_TEST_CASE)),1)
+$(error BUDDY_TEST_CASE must be one integer from 0 to 6)
+endif
+ifneq ($(filter $(BUDDY_TEST_CASE),0 1 2 3 4 5 6),$(BUDDY_TEST_CASE))
+$(error Invalid BUDDY_TEST_CASE '$(BUDDY_TEST_CASE)': use 0 to 6)
+endif
+ifeq ($(BUDDY_TEST),1)
+ifneq ($(PMM),buddy)
+$(error BUDDY_TEST=1 requires PMM=buddy)
+endif
+CFLAGS += -DBUDDY_TEST -DBUDDY_TEST_CASE=$(BUDDY_TEST_CASE)
+else ifneq ($(BUDDY_TEST),0)
+$(error Invalid BUDDY_TEST '$(BUDDY_TEST)': use 0 or 1)
+else ifneq ($(BUDDY_TEST_CASE),0)
+$(error BUDDY_TEST_CASE requires BUDDY_TEST=1)
+endif
 CFLAGS2 = $(CFLAGS) -D ucore_test
 CTYPE	:= c S
 LD      := $(GCCPREFIX)ld
