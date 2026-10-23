@@ -16,7 +16,7 @@
 |------|----------------|
 | 2412700-甘文杰 | 实现 Best-Fit 连续物理内存分配算法，双GDB调试与交叉验证 |
 | 2412712-王子楸 | Buddy System 分配器的设计、实现、接入与独立测试 |
-| 2413318-向宇航 | 实现物理内存探测与页描述符初始化功能 |
+| 2413318-向宇航 | 实现物理内存探测与页描述符初始化功能，实现 SLUB 分配器和相关测试 |
 
 实验报告如何分工？
 
@@ -40,7 +40,7 @@
 |------|------------|---------|------|
 | 2412700-甘文杰 | Codex | GPT-6.0-Luna | 无 |
 | 2412712-王子楸 | Codex | GPT-6.1 Sol High | 无 |
-| 2413318-向宇航 | Codex | GPT-6.1 Sol Light | 无 |
+| 2413318-向宇航 | Codex | GPT-6.1 Sol Light & Medium | 无 |
 
 **说明：**
 - **AI 编程工具**：指具体使用的终端工具、编辑器插件、桌面应用或浏览器界面
@@ -280,11 +280,9 @@ void pmm_init(void);
 - 测试通过的结果（make grade），只有一个
 -->
 
-**测试截图：**
+### A1：物理内存初始化阶段验证
 
-![测试结果截图](./images/test_result.png)
-
-### 验证初始化函数
+本线负责人为 2413318-向宇航。
 
 在lab2代码的修改之前，运行 `make qemu`，可以编译过程中有报错，如下图所示：
 
@@ -302,19 +300,9 @@ void pmm_init(void);
 
 ![初始化验证截图](./images/init_check.png)
 
-### A 线：物理内存初始化阶段验证
 
-以下阶段性结果及截图保留自 `2ada293` 的小组报告，负责人为 2413318-向宇航。基线构建截图显示，未完成的 Best-Fit 实现因 `free_list`、`nr_free` 未声明而编译失败：
+截图显示 Page Init 为 `OK`，Best-Fit 为 `WRONG`，总分 `10/20`。这是 Best-Fit 接入验收前的中间结果，后续会在 B2 阶段完成 Best-Fit 的接入和验收。
 
-![Best-Fit 尚未完成时的基线构建错误](./images/baseline.png)
-
-完成 `page_init()` 并补齐 Best-Fit 模块后，`make qemu` 成功启动，初始化时仍注册 `default_pmm_manager`，并输出物理内存范围、页描述符范围和 `check_alloc_page() succeeded!`：
-
-![物理内存初始化后的 QEMU 输出](./images/init.png)
-
-该阶段的 `make grade` 截图显示 Page Init 为 `OK`，Best-Fit 为 `WRONG`，总分 `10/20`。这是 Best-Fit 接入验收前的中间结果；后续 B2 的最终评分见下表，为 `20/20`：
-
-![阶段性 make grade 结果](./images/init_check.png)
 
 ### B1：Best-Fit 分配器验证
 
@@ -504,6 +492,19 @@ bash tools/run_buddy_tests.sh \
 
 2026-10-23 合并同步复测：使用 QEMU 4.1.1、RISC-V GCC 10.2.0 运行完整脚本，退出码为 0。八个正常场景、六个非法调用、四种后端回归和四个非法配置检查全部符合预期；默认及显式 Best-Fit 输出 `best_fit_pmm_manager`，显式 First-Fit 输出 `default_pmm_manager`，Buddy 输出 `buddy_pmm_manager`，各正常启动均通过公共自检。脚本成功结束后保留默认 Best-Fit 构建；本次未运行 `make grade`。
 
+### A3：Buddy System 验证
+
+在当前声明的单 hart、整块释放约定下，未发现需要阻塞合入的 Buddy 正确性问题。
+检查结果：
+- 按阶拆分、绝对物理页号 XOR 寻找伙伴、同阶合并和空闲计数逻辑一致。
+- 非对齐区域、非二次幂长度、分次登记相邻区域及保留空洞处理合理。
+- 向上取整后的整个块被保留；释放必须传原始请求长度，错误长度、内部页释放和重复释放均有断言保护。
+
+验证边界：独立测试最多使用 64 页，较高阶块缺少专门测试；本次未运行 make grade，也未验证并发和实际物理页数据读写。工作区源码未修改。
+
+![Buddy System 编译验证](./images/buddy_check_compile.png)
+
+![Buddy System 运行程序验证](./images/buddy_check_run.png)
 
 ---
 
