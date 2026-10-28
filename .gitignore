@@ -14,3 +14,7 @@ Thumbs.db
 *.tmp
 *.swp
 *~
+
+# binaries
+code/bin/
+code/obj/
