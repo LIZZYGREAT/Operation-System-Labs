@@ -82,6 +82,20 @@ void print_regs(struct pushregs *gpr) {
 
 //lab3 function2 YOUR CODE
 
+/*
+ * 临时占位：仅提供处理函数定义，供分项开发时编译、链接。
+ * 当前尚未实现 Lab3 的中断和异常处理功能，后续必须替换这两个函数体。
+ * 实际进入占位函数时，打印 Trap frame 并明确报错，避免误认为功能已完成。
+ */
+void interrupt_handler(struct trapframe *tf) {
+    print_trapframe(tf);
+    panic("Lab3 interrupt_handler is a placeholder; not implemented");
+}
+
+void exception_handler(struct trapframe *tf) {
+    print_trapframe(tf);
+    panic("Lab3 exception_handler is a placeholder; not implemented");
+}
 
 static inline void trap_dispatch(struct trapframe *tf) {
     if ((intptr_t)tf->cause < 0) {
