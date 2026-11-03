@@ -6,10 +6,12 @@
 #include <memlayout.h>
 #include <mmu.h>
 #include <riscv.h>
+#include <sbi.h>
 #include <stdio.h>
 #include <trap.h>
 
 #define TICK_NUM 100
+#define TICK_SHUTDOWN_NUM (TICK_NUM * 10)
 
 static void print_ticks() {
     cprintf("%d ticks\n", TICK_NUM);
@@ -82,14 +84,30 @@ void print_regs(struct pushregs *gpr) {
 
 //lab3 function2 YOUR CODE
 
-/*
- * 临时占位：仅提供处理函数定义，供分项开发时编译、链接。
- * 当前尚未实现 Lab3 的中断和异常处理功能，后续必须替换这两个函数体。
- * 实际进入占位函数时，打印 Trap frame 并明确报错，避免误认为功能已完成。
- */
+//2412700
 void interrupt_handler(struct trapframe *tf) {
-    print_trapframe(tf);
-    panic("Lab3 interrupt_handler is a placeholder; not implemented");
+    uintptr_t interrupt_bit = (uintptr_t)1 << (__riscv_xlen - 1);
+    uintptr_t cause = tf->cause & ~interrupt_bit;
+
+    switch (cause) {
+    case IRQ_S_TIMER:
+        clock_set_next_event();
+        ticks++;
+        if (ticks % TICK_NUM == 0) {
+            print_ticks();
+        }
+        if (ticks == TICK_SHUTDOWN_NUM) {
+            sbi_shutdown();
+        }
+        break;
+    case IRQ_S_SOFT:
+        cprintf("Supervisor software interrupt\n");
+        break;
+    default:
+        cprintf("Unknown interrupt: cause %d\n", (int)cause);
+        print_trapframe(tf);
+        break;
+    }
 }
 
 void exception_handler(struct trapframe *tf) {
