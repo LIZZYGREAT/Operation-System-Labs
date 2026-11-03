@@ -35,7 +35,8 @@ static void check_alloc_page(void);
 
 // init_pmm_manager - initialize a pmm_manager instance
 static void init_pmm_manager(void) {
-    pmm_manager = &default_pmm_manager;
+    // lab3 A1 - 2412712: select the migrated Lab2 Best-Fit implementation.
+    pmm_manager = &best_fit_pmm_manager;
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -82,6 +83,72 @@ size_t nr_free_pages(void) {
 }
 
 //lab2 请补充你在lab2中的代码
+//lab2 function1 2413318
+static void page_init(void) {
+    extern char end[];
+    uint64_t memory_base = get_memory_base();
+    uint64_t memory_size = get_memory_size();
+
+    va_pa_offset = PHYSICAL_MEMORY_OFFSET;
+    // lab3 A1 - 2412712: derive bounds from the current mapping macros.
+    uintptr_t kernel_begin_pa = KERNBASE - va_pa_offset;
+    uintptr_t physical_limit = KERNTOP - va_pa_offset;
+    if (memory_base == 0 || memory_size == 0 ||
+        memory_size > (uint64_t)-1 - memory_base) {
+        panic("page_init: invalid DTB memory range");
+    }
+    uint64_t memory_end = memory_base + memory_size;
+    cprintf("Physical memory from DTB: [0x%016lx, 0x%016lx)\n",
+            memory_base, memory_end);
+
+    // The fixed nbase layout may describe unavailable lower pages, but they
+    // remain reserved. The reported range must contain the whole kernel.
+    uintptr_t kernel_end = PADDR(end);
+    if (memory_base > kernel_begin_pa || kernel_end < kernel_begin_pa ||
+        kernel_end > memory_end || kernel_end > physical_limit) {
+        panic("page_init: memory range does not contain the kernel");
+    }
+    uintptr_t managed_end = ROUNDDOWN(
+        memory_end < physical_limit ? memory_end : physical_limit, PGSIZE);
+    if (managed_end <= kernel_begin_pa) {
+        panic("page_init: no manageable memory");
+    }
+    // lab3 A1 - 2412712: bound the rounded layout before computing addresses.
+    if (kernel_end > managed_end) {
+        panic("page_init: insufficient memory for Page descriptors");
+    }
+    npage = PPN(managed_end);
+    size_t page_count = npage - nbase;
+    uintptr_t descriptors_pa = ROUNDUP(kernel_end, PGSIZE);
+
+    // Check capacity before multiplying or touching the descriptor array.
+    if (descriptors_pa > managed_end ||
+        page_count > (managed_end - descriptors_pa) / sizeof(struct Page)) {
+        panic("page_init: insufficient memory for Page descriptors");
+    }
+    uintptr_t descriptors_end = descriptors_pa + page_count * sizeof(struct Page);
+    uintptr_t free_begin = ROUNDUP(descriptors_end, PGSIZE);
+    pages = (struct Page *)(descriptors_pa + va_pa_offset);
+    for (size_t i = 0; i < page_count; i++) {
+        pages[i].flags = 0;
+        SetPageReserved(&pages[i]);
+        set_page_ref(&pages[i], 0);
+        pages[i].property = 0;
+        list_init(&pages[i].page_link);
+    }
+
+    cprintf("Managed physical memory end: 0x%016lx\n", managed_end);
+    cprintf("Page descriptors: PA [0x%016lx, 0x%016lx)\n",
+            descriptors_pa, descriptors_end);
+    if (free_begin < managed_end) {
+        size_t free_count = (managed_end - free_begin) / PGSIZE;
+        init_memmap(pa2page(free_begin), free_count);
+        cprintf("Free physical pages: [0x%016lx, 0x%016lx), %lu pages\n",
+                free_begin, managed_end, free_count);
+    } else {
+        cprintf("page_init: no complete free physical pages to register\n");
+    }
+}
 
 /* pmm_init - initialize the physical memory management */
 void pmm_init(void) {
