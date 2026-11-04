@@ -1,0 +1,52 @@
+
+bin/kernel:     file format elf64-littleriscv
+
+
+Disassembly of section .text:
+
+ffffffffc0200b78 <__alltraps>:
+ffffffffc0200b78:	14011073          	csrw	sscratch,sp
+ffffffffc0200b7c:	712d                	addi	sp,sp,-288
+ffffffffc0200b7e:	e002                	sd	zero,0(sp)
+ffffffffc0200b80:	e406                	sd	ra,8(sp)
+ffffffffc0200b82:	ec0e                	sd	gp,24(sp)
+ffffffffc0200b84:	f012                	sd	tp,32(sp)
+ffffffffc0200b86:	f416                	sd	t0,40(sp)
+ffffffffc0200b88:	f81a                	sd	t1,48(sp)
+ffffffffc0200b8a:	fc1e                	sd	t2,56(sp)
+ffffffffc0200b8c:	e0a2                	sd	s0,64(sp)
+ffffffffc0200b8e:	e4a6                	sd	s1,72(sp)
+ffffffffc0200b90:	e8aa                	sd	a0,80(sp)
+ffffffffc0200b92:	ecae                	sd	a1,88(sp)
+ffffffffc0200b94:	f0b2                	sd	a2,96(sp)
+ffffffffc0200b96:	f4b6                	sd	a3,104(sp)
+ffffffffc0200b98:	f8ba                	sd	a4,112(sp)
+ffffffffc0200b9a:	fcbe                	sd	a5,120(sp)
+ffffffffc0200b9c:	e142                	sd	a6,128(sp)
+ffffffffc0200b9e:	e546                	sd	a7,136(sp)
+ffffffffc0200ba0:	e94a                	sd	s2,144(sp)
+ffffffffc0200ba2:	ed4e                	sd	s3,152(sp)
+ffffffffc0200ba4:	f152                	sd	s4,160(sp)
+ffffffffc0200ba6:	f556                	sd	s5,168(sp)
+ffffffffc0200ba8:	f95a                	sd	s6,176(sp)
+ffffffffc0200baa:	fd5e                	sd	s7,184(sp)
+ffffffffc0200bac:	e1e2                	sd	s8,192(sp)
+ffffffffc0200bae:	e5e6                	sd	s9,200(sp)
+ffffffffc0200bb0:	e9ea                	sd	s10,208(sp)
+ffffffffc0200bb2:	edee                	sd	s11,216(sp)
+ffffffffc0200bb4:	f1f2                	sd	t3,224(sp)
+ffffffffc0200bb6:	f5f6                	sd	t4,232(sp)
+ffffffffc0200bb8:	f9fa                	sd	t5,240(sp)
+ffffffffc0200bba:	fdfe                	sd	t6,248(sp)
+ffffffffc0200bbc:	14001473          	csrrw	s0,sscratch,zero
+ffffffffc0200bc0:	100024f3          	csrr	s1,sstatus
+ffffffffc0200bc4:	14102973          	csrr	s2,sepc
+ffffffffc0200bc8:	143029f3          	csrr	s3,stval
+ffffffffc0200bcc:	14202a73          	csrr	s4,scause
+ffffffffc0200bd0:	e822                	sd	s0,16(sp)
+ffffffffc0200bd2:	e226                	sd	s1,256(sp)
+ffffffffc0200bd4:	e64a                	sd	s2,264(sp)
+ffffffffc0200bd6:	ea4e                	sd	s3,272(sp)
+ffffffffc0200bd8:	ee52                	sd	s4,280(sp)
+ffffffffc0200bda:	850a                	mv	a0,sp
+ffffffffc0200bdc:	f91ff0ef          	jal	ra,ffffffffc0200b6c <trap>
