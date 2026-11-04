@@ -14,7 +14,6 @@
 
 分工文档要求达到条件后关机，但没有给出数值阈值。实现采用 `TICK_SHUTDOWN_NUM = TICK_NUM * 10`，即 1000 次时钟中断。现有 40 分测试在 `ticks == 200` 输出通过标记后继续空转；1000 次阈值让评分标记先输出，再验证 SBI 关机。QEMU 实测在 10 次 `100 ticks` 输出后正常退出。
 
-`exception_handler()`、A1 的内存管理文件、A2 的 `trapentry.S` 均未修改。
 
 ## B1 分支验证
 
@@ -81,5 +80,3 @@ timeout 20s qemu-system-riscv64 \
 
 - B1：`7bd243a feat(lab3/b): implement interrupt handling`
 - B2：本报告及测试记录随本阶段提交。
-
-本成员的 Prompt 记录位于 `report/_work/prompts/wenjie.md`。当前分支没有中央 `report/prompt.md`；本对话内容未加入中央 Prompt 文件。
