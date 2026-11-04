@@ -52,4 +52,4 @@ timeout 20s qemu-system-riscv64 \
 - B1：`7bd243a feat(lab3/b): implement interrupt handling`
 - B2：本报告及测试记录随本阶段提交。
 
-本阶段未修改中央 `report/prompt.md`；B 的实际提示词另存于 `report/_work/prompts/wenjie.md`，供后续按团队流程汇总。
+按用户后续要求，已删除本成员的临时 Prompt 记录。当前分支没有中央 `report/prompt.md`；A、C 成员的 Prompt 记录保留。
