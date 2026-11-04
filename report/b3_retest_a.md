@@ -39,6 +39,10 @@ check_alloc_page() succeeded!
 
 Best-Fit 管理器已选中，DTB 报告的 128 MiB 内存范围有效，页描述符与空闲页范围衔接，固定分配/释放自检成功。启动后时钟输出 10 次 `100 ticks`，随后 QEMU 以退出码 0 结束；当前 B 的 1000 tick SBI 关机逻辑正常完成。
 
+![内存分配器自检、时钟输出与 QEMU 正常退出](./images/b2_shutdown_memory_check.png)
+
+**图 1：** 启动日志显示 `check_alloc_page() succeeded!`，随后输出时钟统计并正常结束。
+
 ## Trap frame、参数和恢复顺序
 
 源码和实际反汇编相互吻合：
@@ -52,6 +56,14 @@ Best-Fit 管理器已选中，DTB 报告的 128 MiB 内存范围有效，页描�
 | 返回状态 | `__trapret` 从偏移 256、264 读取 `status` 和 `epc`，写回 `sstatus`、`sepc`。 |
 | 通用寄存器与栈恢复 | 反汇编显示其他可恢复寄存器从对应槽加载，最后执行 `ld sp,16(sp)`，随后 `sret`。 |
 
+![Trap 入口保存寄存器并调用 trap](./images/b3_trap_entry_disassembly.png)
+
+**图 2：** 入口反汇编显示保存上下文后以 `mv a0,sp` 传递 Trap frame，再调用 `trap`。
+
+![Trap 返回时恢复寄存器、栈和特权状态](./images/b3_trap_restore_disassembly.png)
+
+**图 3：** 返回反汇编显示恢复寄存器和原始 `sp`，最后执行 `sret`。
+
 评分中的 A3 上下文用例通过 `ebreak` 验证异常返回，并逐项比较 `t0–t6`、`s0–s11`、`a1–a7` 共 26 个寄存器，之后继续运行并通过 35 分项。用例没有单独逐值比较 `sp` 或 `ra`；这两者的保存/恢复依据本次反汇编确认，动态评分则验证了断点后的返回和后续执行。
 
 完整评分日志显示：
@@ -62,6 +74,14 @@ illegal instruction EPC advance and return: PASS (25/25)
 re-armed supervisor timer and repeated trap return: PASS (40/40)
 Total Score: 100/100
 ```
+
+![Trap 上下文评分通过](./images/lab3_grade_context_35.png)
+
+**图 4：** 完整评分中的 Trap 入口、寄存器恢复和断点 EPC 项通过，得分 35/35。
+
+![Lab3 完整评分总分](./images/lab3_grade_total100.png)
+
+**图 5：** 集成版本完整评分结果为 100/100。
 
 ## 结论
 
