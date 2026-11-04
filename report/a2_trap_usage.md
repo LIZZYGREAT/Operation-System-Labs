@@ -55,6 +55,6 @@ riscv64-unknown-elf-objdump -d --disassemble=__alltraps --disassemble=__trapret 
 make qemu DEFS=-Dsbadaddr=stval QEMU=/home/catalpa/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64
 ```
 
-C 的真实异常处理就绪后，再使用已有上下文测试验证返回并记录 A3 的 35 分主测结果。本次构建与反汇编通过，不代表运行返回或评分已通过。
+A2 实现阶段仅完成上述构建与反汇编检查。C 的真实异常处理合入后，A 已完成 A3 的 35 分主测及 A4 的 25 分复测，见 [A3+A4 测试记录](./a3_a4_test.md)。
 
-实际提示词及执行记录保存在 `report/prompt_a1,a2.md`。A1、A2 实现及相关记录一并提交至个人分支 `work/lab3/ziqiu`，后续按分工继续联调。
+实际提示词及执行记录保存在 `report/_work/prompts/ziqiu.md`。A1、A2 实现及相关记录已提交至个人分支 `work/lab3/ziqiu`，后续测试结果按 A3+A4 归档。

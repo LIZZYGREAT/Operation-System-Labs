@@ -1,0 +1,85 @@
+/home/catalpa/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64
+QEMU emulator version 4.1.1
+Copyright (c) 2003-2019 Fabrice Bellard and the QEMU Project developers
+riscv64-unknown-elf-gcc (g1b306039ac4) 15.1.0
+Copyright (C) 2025 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+lab3 injection complete
+Building trap entry, register restore, and breakpoint EPC...
++ cc kern/init/entry.S
++ cc kern/init/init.c
++ cc kern/libs/stdio.c
++ cc kern/debug/kdebug.c
++ cc kern/debug/kmonitor.c
++ cc kern/debug/panic.c
++ cc kern/driver/clock.c
++ cc kern/driver/console.c
++ cc kern/driver/dtb.c
++ cc kern/driver/intr.c
++ cc kern/trap/trap.c
++ cc kern/trap/trapentry.S
++ cc kern/mm/best_fit_pmm.c
++ cc kern/mm/default_pmm.c
++ cc kern/mm/pmm.c
++ cc kern/test/test_lab3.c
++ cc kern/test/test_lab3_context.S
++ cc libs/printfmt.c
++ cc libs/readline.c
++ cc libs/sbi.c
++ cc libs/string.c
++ ld bin/kernel
+Running trap entry, register restore, and breakpoint EPC...
+  - trap entry, register restore, and breakpoint EPC: PASS (35/35)
+Building illegal instruction EPC advance and return...
++ cc kern/init/entry.S
++ cc kern/init/init.c
++ cc kern/libs/stdio.c
++ cc kern/debug/kdebug.c
++ cc kern/debug/kmonitor.c
++ cc kern/debug/panic.c
++ cc kern/driver/clock.c
++ cc kern/driver/console.c
++ cc kern/driver/dtb.c
++ cc kern/driver/intr.c
++ cc kern/trap/trap.c
++ cc kern/trap/trapentry.S
++ cc kern/mm/best_fit_pmm.c
++ cc kern/mm/default_pmm.c
++ cc kern/mm/pmm.c
++ cc kern/test/test_lab3.c
++ cc kern/test/test_lab3_context.S
++ cc libs/printfmt.c
++ cc libs/readline.c
++ cc libs/sbi.c
++ cc libs/string.c
++ ld bin/kernel
+Running illegal instruction EPC advance and return...
+  - illegal instruction EPC advance and return: PASS (25/25)
+Building re-armed supervisor timer and repeated trap return...
++ cc kern/init/entry.S
++ cc kern/init/init.c
++ cc kern/libs/stdio.c
++ cc kern/debug/kdebug.c
++ cc kern/debug/kmonitor.c
++ cc kern/debug/panic.c
++ cc kern/driver/clock.c
++ cc kern/driver/console.c
++ cc kern/driver/dtb.c
++ cc kern/driver/intr.c
++ cc kern/trap/trap.c
++ cc kern/trap/trapentry.S
++ cc kern/mm/best_fit_pmm.c
++ cc kern/mm/default_pmm.c
++ cc kern/mm/pmm.c
++ cc kern/test/test_lab3.c
++ cc kern/test/test_lab3_context.S
++ cc libs/printfmt.c
++ cc libs/readline.c
++ cc libs/sbi.c
++ cc libs/string.c
++ ld bin/kernel
+Running re-armed supervisor timer and repeated trap return...
+  - re-armed supervisor timer and repeated trap return: PASS (40/40)
+Total Score: 100/100
