@@ -114,8 +114,21 @@ void interrupt_handler(struct trapframe *tf) {
 }
 
 void exception_handler(struct trapframe *tf) {
-    print_trapframe(tf);
-    panic("Lab3 exception_handler is a placeholder; not implemented");
+    // lab3 C1 - 2413318: skip the faulting 16-bit or 32-bit instruction.
+    switch (tf->cause) {
+    case CAUSE_ILLEGAL_INSTRUCTION:
+        cprintf("Illegal instruction at 0x%016lx\n", (unsigned long)tf->epc);
+        break;
+    case CAUSE_BREAKPOINT:
+        cprintf("Breakpoint at 0x%016lx\n", (unsigned long)tf->epc);
+        break;
+    default:
+        print_trapframe(tf);
+        return;
+    }
+
+    uint16_t instruction = *(const uint16_t *)tf->epc;
+    tf->epc += (instruction & 0x3) == 0x3 ? 4 : 2;
 }
 
 static inline void trap_dispatch(struct trapframe *tf) {
