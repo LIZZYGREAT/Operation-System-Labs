@@ -1,0 +1,8 @@
+{
+  "make clean": 0,
+  "make V= DEFS=-Dsbadaddr=stval -DGRADE_LAB3_ILLEGAL": 0,
+  "qemu_exit": 0,
+  "seconds": 10.34,
+  "temporary_code": "/tmp/lab3-c2-5k86zzf1/code",
+  "implementation_commit": "efa5e989fc196c21f6b9f2b0b3778d5397a5bcf5"
+}
