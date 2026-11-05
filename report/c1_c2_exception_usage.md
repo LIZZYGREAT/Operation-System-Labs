@@ -85,4 +85,4 @@ cat "$c2_root/code/c2-qemu.log"
 
 本实验未实现完整的进程级异常隔离、向用户程序发送信号、缺页恢复或调度切换；兜底打印与这些机制的职责不同。
 
-整理后的示例 Prompt 见 [prompt_c1,c2.md](./prompt_c1,c2.md)，沿用 `[PROMPT]`、`[RELY]`、`[GUARANTEE]`、`[SPECIFICATION]` 模板；不保存实际对话，也不将示例描述为执行历史。未推送、未合并，未执行 C3。
+整理后的示例 Prompt 见 [个人 Prompt](./_work/prompts/yuhang.md)，沿用 `[PROMPT]`、`[RELY]`、`[GUARANTEE]`、`[SPECIFICATION]` 模板；

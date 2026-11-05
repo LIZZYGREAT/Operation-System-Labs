@@ -1,0 +1,141 @@
+{
+  "baseline": "222162ce44b2cd84a9fa854a192a006c618ee7c1",
+  "workspace": "/tmp/lab3-c3-vch_ft6r",
+  "versions": {
+    "make": "GNU Make 4.3",
+    "riscv64-unknown-elf-gcc": "riscv64-unknown-elf-gcc (SiFive GCC-Metal 10.2.0-2020.12.8) 10.2.0",
+    "qemu-system-riscv64": "QEMU emulator version 4.1.1",
+    "python3": "Python 3.12.3"
+  },
+  "cases": {
+    "timer": {
+      "steps": [
+        {
+          "command": [
+            "python3",
+            "tools/inject.py",
+            "/tmp/lab3-c3-vch_ft6r/timer/code"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/timer/code",
+          "exit_code": 0,
+          "seconds": 0.033,
+          "log": "c3-timer-inject.log"
+        },
+        {
+          "command": [
+            "make",
+            "clean"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/timer/code",
+          "exit_code": 0,
+          "seconds": 0.017,
+          "log": "c3-timer-clean.log"
+        },
+        {
+          "command": [
+            "make",
+            "V=",
+            "DEFS=-Dsbadaddr=stval -DGRADE_LAB3_TIMER"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/timer/code",
+          "exit_code": 0,
+          "seconds": 1.651,
+          "log": "c3-timer-build.log"
+        },
+        {
+          "command": [
+            "timeout",
+            "20s",
+            "qemu-system-riscv64",
+            "-machine",
+            "virt",
+            "-nographic",
+            "-bios",
+            "default",
+            "-device",
+            "loader,file=bin/ucore.img,addr=0x80200000",
+            "-serial",
+            "file:/home/yuhang/dev/Operation-System-Labs/report/_work/logs/c3-timer-qemu.log",
+            "-monitor",
+            "none",
+            "-no-reboot"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/timer/code",
+          "exit_code": 0,
+          "seconds": 10.342,
+          "log": "c3-timer-qemu-stderr.log"
+        }
+      ],
+      "tick_output_count": 10,
+      "timer_pass_count": 1,
+      "checks": {
+        "normal_exit_before_timeout": true,
+        "exactly_ten_tick_lines": true,
+        "no_fail_or_panic": true,
+        "memory_self_check": true,
+        "timer_initialized": true,
+        "expected_timer_marker": true
+      },
+      "passed": true
+    },
+    "normal": {
+      "steps": [
+        {
+          "command": [
+            "make",
+            "clean"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/normal/code",
+          "exit_code": 0,
+          "seconds": 0.014,
+          "log": "c3-normal-clean.log"
+        },
+        {
+          "command": [
+            "make",
+            "V=",
+            "DEFS=-Dsbadaddr=stval"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/normal/code",
+          "exit_code": 0,
+          "seconds": 1.394,
+          "log": "c3-normal-build.log"
+        },
+        {
+          "command": [
+            "timeout",
+            "20s",
+            "qemu-system-riscv64",
+            "-machine",
+            "virt",
+            "-nographic",
+            "-bios",
+            "default",
+            "-device",
+            "loader,file=bin/ucore.img,addr=0x80200000",
+            "-serial",
+            "file:/home/yuhang/dev/Operation-System-Labs/report/_work/logs/c3-normal-qemu.log",
+            "-monitor",
+            "none",
+            "-no-reboot"
+          ],
+          "cwd": "/tmp/lab3-c3-vch_ft6r/normal/code",
+          "exit_code": 0,
+          "seconds": 10.329,
+          "log": "c3-normal-qemu-stderr.log"
+        }
+      ],
+      "tick_output_count": 10,
+      "timer_pass_count": 0,
+      "checks": {
+        "normal_exit_before_timeout": true,
+        "exactly_ten_tick_lines": true,
+        "no_fail_or_panic": true,
+        "memory_self_check": true,
+        "timer_initialized": true,
+        "expected_timer_marker": true
+      },
+      "passed": true
+    }
+  }
+}

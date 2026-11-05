@@ -1,0 +1,41 @@
++ cc kern/init/entry.S
+riscv64-unknown-elf-gcc -Ikern/init/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/init/entry.S -o obj/kern/init/entry.o
++ cc kern/init/init.c
+riscv64-unknown-elf-gcc -Ikern/init/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/init/init.c -o obj/kern/init/init.o
++ cc kern/libs/stdio.c
+riscv64-unknown-elf-gcc -Ikern/libs/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/libs/stdio.c -o obj/kern/libs/stdio.o
++ cc kern/debug/kdebug.c
+riscv64-unknown-elf-gcc -Ikern/debug/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/debug/kdebug.c -o obj/kern/debug/kdebug.o
++ cc kern/debug/kmonitor.c
+riscv64-unknown-elf-gcc -Ikern/debug/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/debug/kmonitor.c -o obj/kern/debug/kmonitor.o
++ cc kern/debug/panic.c
+riscv64-unknown-elf-gcc -Ikern/debug/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/debug/panic.c -o obj/kern/debug/panic.o
++ cc kern/driver/clock.c
+riscv64-unknown-elf-gcc -Ikern/driver/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/driver/clock.c -o obj/kern/driver/clock.o
++ cc kern/driver/console.c
+riscv64-unknown-elf-gcc -Ikern/driver/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/driver/console.c -o obj/kern/driver/console.o
++ cc kern/driver/dtb.c
+riscv64-unknown-elf-gcc -Ikern/driver/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/driver/dtb.c -o obj/kern/driver/dtb.o
++ cc kern/driver/intr.c
+riscv64-unknown-elf-gcc -Ikern/driver/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/driver/intr.c -o obj/kern/driver/intr.o
++ cc kern/trap/trap.c
+riscv64-unknown-elf-gcc -Ikern/trap/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/trap/trap.c -o obj/kern/trap/trap.o
++ cc kern/trap/trapentry.S
+riscv64-unknown-elf-gcc -Ikern/trap/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/trap/trapentry.S -o obj/kern/trap/trapentry.o
++ cc kern/mm/best_fit_pmm.c
+riscv64-unknown-elf-gcc -Ikern/mm/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/mm/best_fit_pmm.c -o obj/kern/mm/best_fit_pmm.o
++ cc kern/mm/default_pmm.c
+riscv64-unknown-elf-gcc -Ikern/mm/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/mm/default_pmm.c -o obj/kern/mm/default_pmm.o
++ cc kern/mm/pmm.c
+riscv64-unknown-elf-gcc -Ikern/mm/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/ -Ikern/debug/ -Ikern/driver/ -Ikern/trap/ -Ikern/mm/ -Ikern/arch/ -c kern/mm/pmm.c -o obj/kern/mm/pmm.o
++ cc libs/printfmt.c
+riscv64-unknown-elf-gcc -Ilibs/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/  -c libs/printfmt.c -o obj/libs/printfmt.o
++ cc libs/readline.c
+riscv64-unknown-elf-gcc -Ilibs/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/  -c libs/readline.c -o obj/libs/readline.o
++ cc libs/sbi.c
+riscv64-unknown-elf-gcc -Ilibs/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/  -c libs/sbi.c -o obj/libs/sbi.o
++ cc libs/string.c
+riscv64-unknown-elf-gcc -Ilibs/ -mcmodel=medany -std=gnu99 -Wno-unused -Werror  -fno-builtin -Wall -O2 -nostdinc -Dsbadaddr=stval -fno-stack-protector -ffunction-sections -fdata-sections -g -Ilibs/  -c libs/string.c -o obj/libs/string.o
++ ld bin/kernel
+riscv64-unknown-elf-ld -m elf64lriscv -nostdlib --gc-sections -T tools/kernel.ld -o bin/kernel obj/kern/init/entry.o obj/kern/init/init.o obj/kern/libs/stdio.o obj/kern/debug/kdebug.o obj/kern/debug/kmonitor.o obj/kern/debug/panic.o obj/kern/driver/clock.o obj/kern/driver/console.o obj/kern/driver/dtb.o obj/kern/driver/intr.o obj/kern/trap/trap.o obj/kern/trap/trapentry.o obj/kern/mm/best_fit_pmm.o obj/kern/mm/default_pmm.o obj/kern/mm/pmm.o obj/libs/printfmt.o obj/libs/readline.o obj/libs/sbi.o obj/libs/string.o
+riscv64-unknown-elf-objcopy bin/kernel --strip-all -O binary bin/ucore.img
