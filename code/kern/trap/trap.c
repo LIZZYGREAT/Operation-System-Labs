@@ -106,6 +106,9 @@ void interrupt_handler(struct trapframe *tf) {
     case IRQ_S_SOFT:
         cprintf("Supervisor software interrupt\n");
         break;
+    case IRQ_S_EXT:
+        cprintf("Supervisor external interrupt\n");
+        break;
     default:
         cprintf("Unknown interrupt: cause %d\n", (int)cause);
         print_trapframe(tf);
