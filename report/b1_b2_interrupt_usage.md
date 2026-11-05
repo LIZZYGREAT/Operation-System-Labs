@@ -14,7 +14,18 @@
 
 分工文档要求达到条件后关机，但没有给出数值阈值。实现采用 `TICK_SHUTDOWN_NUM = TICK_NUM * 10`，即 1000 次时钟中断。现有 40 分测试在 `ticks == 200` 输出通过标记后继续空转；1000 次阈值让评分标记先输出，再验证 SBI 关机。QEMU 实测在 10 次 `100 ticks` 输出后正常退出。
 
-`exception_handler()`、A1 的内存管理文件、A2 的 `trapentry.S` 均未修改。
+
+## B1 分支验证
+
+在临时测试副本中直接调用软件中断和未知中断分支，分别核对提示文本与 Trap frame 输出。该补充用例验证 handler 的分支行为；它不表示 QEMU 硬件实际产生了未知中断。完整串口输出保存在 `report/_work/logs/b1-fallback-qemu.log`。
+
+![B1 软件中断和未知中断提示](./images/b1_fallback_output_part1.png)
+
+**图 1：** 直接调用测试显示软件中断提示、未知中断 cause 15 和 Trap frame。
+
+![B1 未知中断 Trap frame 与分支测试结束](./images/b1_fallback_output_part2.png)
+
+**图 2：** Trap frame 输出后，B1 fallback 测试继续完成；下方时钟输出来自同一临时运行。
 
 ## B2 测试记录
 
@@ -28,6 +39,24 @@
 | 进程清理 | QEMU 与 GDB 进程名查询 | 两次 QEMU 运行结束后均未发现残留 `qemu-system-riscv64` 进程；未发现残留 `riscv64-unknown-elf-gdb` 进程。 |
 
 完整评分日志和串口记录保存在 `report/_work/logs/`。独立分支测试在 `/tmp` 临时副本进行；未改动仓库中的测试注入脚本或 A/C 源文件。
+
+### 集成版本复测
+
+C1 合入后重新运行完整评分：`make grade DEFS=-Dsbadaddr=stval` 退出码为 0，总分 **100/100**。其中 B2 持续时钟项为 **40/40**，串口检查匹配 `100 ticks` 和 `ticks=200`。
+
+![集成评分中非法指令兜底与持续时钟测试通过](./images/lab3_grade_illegal_timer_25_40.png)
+
+**图 3：** 完整评分的后两项分别通过 25/25 和 40/40。
+
+![完整评分总分 100](./images/lab3_grade_total100.png)
+
+**图 4：** 评分脚本输出总分 100/100。
+
+另行运行正式内核，确认统计输出和关机：QEMU 打印 10 次 `100 ticks`，随后在 20 秒限制内以退出码 0 结束。
+
+![B2 持续时钟输出、QEMU 关机及内存自检](./images/b2_shutdown_memory_check.png)
+
+**图 5：** QEMU 输出时钟统计并正常退出；同次启动也显示 Best-Fit 内存固定自检成功。
 
 独立计时复现的关键命令如下；构建 stdout/stderr 在 `b2-timer-build.log`，QEMU 串口在 `b2-timer-qemu.log`：
 
@@ -51,5 +80,3 @@ timeout 20s qemu-system-riscv64 \
 
 - B1：`7bd243a feat(lab3/b): implement interrupt handling`
 - B2：本报告及测试记录随本阶段提交。
-
-本阶段未修改中央 `report/prompt.md`；B 的实际提示词另存于 `report/_work/prompts/wenjie.md`，供后续按团队流程汇总。
