@@ -112,7 +112,7 @@ flowchart TD
 
 **按依赖开展主测。** A3 的 35 分项需要 A2 和 C1 的断点处理配合；B2 的 40 分项需要 A2 和 B1；C2 的 25 分项同时使用异常处理和中断兜底，因此依赖 A、B、C 的实现。35 分和 40 分可以在各自依赖就绪后分别进行，25 分项待相关实现齐备后运行。图中的三条主测分支表示职责和依赖，实际可通过完整评分入口依次执行三组用例。
 
-**通过交叉复测后汇总与终审。** B 复测 A 的上下文与内存基础，C 复测 B 的时钟和关机，A 复测 C 的异常与兜底。各人记录所用版本、命令和真实结果，再由 B 汇总报告、`prompt.md` 和测试材料。全员共同确认完整评分、关机验证、交叉复测记录及报告一致性后，由 B 完成分支合并。
+**通过交叉复测后汇总与终审。** B 复测 A 的上下文与内存基础，C 复测 B 的时钟和关机，A 复测 C 的异常与兜底。各人记录所用版本、命令和真实结果，再由 B 汇总报告、各成员的提示词记录（[A 组](./_work/prompts/ziqiu.md)、[B 组](./_work/prompts/wenjie.md)、[C 组](./_work/prompts/yuhang.md)）和测试材料。全员共同确认完整评分、关机验证、交叉复测记录及报告一致性后，由 B 完成分支合并。
 
 ---
 
@@ -170,7 +170,7 @@ uintptr_t physical_limit = KERNTOP - va_pa_offset;
 
 #### 最终提示词
 
-本模块的提示词及执行过程见 `prompt.md` 中 A1 对应部分。
+本模块的提示词及执行过程见 [A 组 Prompt 记录](./_work/prompts/ziqiu.md) 中 A1 对应部分。
 
 #### 实现迭代过程
 
@@ -212,9 +212,9 @@ void trap(struct trapframe *tf);
 
 目标为 RISC-V64，`REGBYTES` 为 8。Trap frame 共 36 个槽，大小为：
 
-\[
+$$
 36 \times 8 = 288\ \mathrm{B}
-\]
+$$
 
 | 保存内容 | 槽位 | 字节偏移 |
 | --- | --- | --- |
@@ -273,7 +273,7 @@ LOAD x2, 2*REGBYTES(sp)
 
 #### 最终提示词
 
-本模块的提示词及执行过程见 `prompt.md` 中 A2 对应部分。
+本模块的提示词及执行过程见 [A 组 Prompt 记录](./_work/prompts/ziqiu.md) 中 A2 对应部分。
 
 #### 实现迭代过程
 
@@ -342,7 +342,7 @@ default:
 
 #### 最终提示词
 
-本模块的提示词及讨论记录见 [B 组 Prompt](../prompts/wenjie.md) 中 B1 对应部分。主要围绕 Trap 的整体路径、`scause` 的含义、如何根据原因编号分支，以及不同分支应输出什么信息来确定实现要求。
+本模块的提示词及讨论记录见 [B 组 Prompt](./_work/prompts/wenjie.md) 中 B1 对应部分。主要围绕 Trap 的整体路径、`scause` 的含义、如何根据原因编号分支，以及不同分支应输出什么信息来确定实现要求。
 
 #### 实现迭代过程
 
@@ -403,7 +403,7 @@ case IRQ_S_TIMER:
 
 #### 最终提示词
 
-本部分对应 [B 组 Prompt](../prompts/wenjie.md) 中关于时钟事件、`ticks` 更新、统计输出与关机条件的 B1/B2 问题。学习时重点确认了第一次计时事件由谁设置、为什么处理时还要设置下一次，以及测试在 200 次通过后为什么还能继续运行。
+本部分对应 [B 组 Prompt](./_work/prompts/wenjie.md) 中关于时钟事件、`ticks` 更新、统计输出与关机条件的 B1/B2 问题。学习时重点确认了第一次计时事件由谁设置、为什么处理时还要设置下一次，以及测试在 200 次通过后为什么还能继续运行。
 
 #### 实现迭代过程
 
@@ -444,7 +444,7 @@ make qemu DEFS=-Dsbadaddr=stval \
 
 如图所示输出 `memory management: best_fit_pmm_manager` 和 `check_alloc_page() succeeded!`，说明所选管理器正确，固定自检完成。
 
-![A1 集成版本启动、Best-Fit 内存初始化与固定自检成功](../../images/a1_memory_qemu.png)
+![A1 集成版本启动、Best-Fit 内存初始化与固定自检成功](./images/a1_memory_qemu.png)
 
 **图 1：** 正式内核完成 Best-Fit 内存初始化和固定自检，并继续执行时钟初始化。
 
@@ -459,23 +459,23 @@ make qemu DEFS=-Dsbadaddr=stval \
 
 页大小为 4 KiB，128 MiB 内存共包含：
 
-\[
+$$
 128 \times 1024 \div 4 = 32768\ \text{页}
-\]
+$$
 
 每个 `struct Page` 占 40 字节，描述符数组占用：
 
-\[
+$$
 32768 \times 40 = 1310720\ \mathrm{B} = 320\ \text{页}
-\]
+$$
 
 因此，可分配页数为：
 
-\[
+$$
 32768 - 512 - 7 - 320 = 31929\ \text{页}
-\]
+$$
 
-独立计算与启动输出一致，保留区与空闲区的划分符合预期。运行日志见 [a1-qemu-report.log](../logs/a1-qemu-report.log)。
+独立计算与启动输出一致，保留区与空闲区的划分符合预期。运行日志见 [a1-qemu-report.log](./_work/logs/a1-qemu-report.log)。
 
 A1 阶段还曾在 `pmm_init()` 返回后、开启时钟前，通过 GDB 核对当时镜像的描述符和空闲链表：共 32,768 个描述符，839 页保留、31,929 页空闲，计数与链表关系一致。
 
@@ -504,7 +504,7 @@ A2 实现阶段的完整编译、链接和镜像生成通过。关键指令检�
 | 栈指针恢复 | 在其他帧访问完成后执行 `ld sp,16(sp)`，恢复第 2 槽保存的原始栈指针 |
 | Trap 返回 | 恢复完成后执行 `sret` |
 
-![A2 Trap 入口传参、CSR 恢复及最后恢复栈指针的关键反汇编](../../images/a2_trap_disassembly.png)
+![A2 Trap 入口传参、CSR 恢复及最后恢复栈指针的关键反汇编](./images/a2_trap_disassembly.png)
 
 **图 2：** Trap 入口与上下文恢复的关键反汇编，展示参数传递、CSR 写回以及最后恢复 `sp` 的顺序。
 
@@ -548,11 +548,11 @@ CSR 兼容定义通过 `CC` 传入，保留评分脚本为各用例设置的宏�
 | 第一轮 | A3：上下文与断点主测 | 35/35、25/25、40/40，总分 100/100，退出码 0 | 保留完整日志，当前文件名为 `a3a4-grade.log` |
 | 第二轮 | 复核 B2、C2，其中 C2 计入 A4 独立复测 | 35/35、25/25、40/40，总分 100/100，退出码 0 | 未另存日志，按实际执行记录说明 |
 
-![已有完整评分日志摘录：QEMU 版本、三项 PASS 与总分 100/100](../../images/a3_a4_grade.png)
+![已有完整评分日志摘录：QEMU 版本、三项 PASS 与总分 100/100](./images/a3_a4_grade.png)
 
-**图 3：** 已有完整评分日志摘录，包含版本信息、三项 PASS 和总分。完整保存日志见 [a3a4-grade.log](../logs/a3a4-grade.log)；该图展示保存日志的结果，第二轮复测情况按上表单独记录。
+**图 3：** 已有完整评分日志摘录，包含版本信息、三项 PASS 和总分。完整保存日志见 [a3a4-grade.log](./_work/logs/a3a4-grade.log)；该图展示保存日志的结果，第二轮复测情况按上表单独记录。
 
-A3 的 35 分主测和 A4 的 25 分独立复测均已完成，提示词及执行过程见 `prompt.md` 中 A3+A4 对应部分。
+A3 的 35 分主测和 A4 的 25 分独立复测均已完成，提示词及执行过程见 [A 组 Prompt 记录](./_work/prompts/ziqiu.md) 中 A3+A4 对应部分。
 
 ### 5.4 B1：软件中断与未知中断分支验证
 
@@ -567,13 +567,13 @@ A3 的 35 分主测和 A4 的 25 分独立复测均已完成，提示词及执�
 
 **实际结果：**
 
-临时副本的构建与 QEMU 运行退出码均为 0。串口显示软件中断提示、未知中断编号和完整的 Trap frame 输出，处理完成后能够继续执行测试。原始日志见 [b1-fallback-qemu.log](../logs/b1-fallback-qemu.log)。
+临时副本的构建与 QEMU 运行退出码均为 0。串口显示软件中断提示、未知中断编号和完整的 Trap frame 输出，处理完成后能够继续执行测试。原始日志见 [b1-fallback-qemu.log](./_work/logs/b1-fallback-qemu.log)。
 
-![B1 软件中断与未知中断提示](../../images/b1_fallback_output_part1.png)
+![B1 软件中断与未知中断提示](./images/b1_fallback_output_part1.png)
 
 **图 1：** 软件中断的固定输出以及未知中断 cause 15 的分支提示。
 
-![B1 未知中断 Trap frame 与测试继续执行](../../images/b1_fallback_output_part2.png)
+![B1 未知中断 Trap frame 与测试继续执行](./images/b1_fallback_output_part2.png)
 
 **图 2：** 未知中断输出 Trap frame 后继续完成测试。后面的时钟提示来自同一次临时运行。
 
@@ -610,7 +610,7 @@ timeout 20s qemu-system-riscv64 \
   -monitor none -no-reboot
 ```
 
-这里的 `<串口日志的绝对路径>` 需要换成本机实际的日志路径。B2 实际使用的临时目录及完整命令见 [B1/B2 验证记录](../../b1_b2_interrupt_usage.md)，对应构建和串口日志保存在 `report/_work/logs/`。
+这里的 `<串口日志的绝对路径>` 需要换成本机实际的日志路径。B2 实际使用的临时目录及完整命令见 [B1/B2 验证记录](./b1_b2_interrupt_usage.md)，对应构建和串口日志保存在 `./_work/logs/`。
 
 | 检查项目 | 本人实际结果 | 对应说明 |
 | --- | --- | --- |
@@ -621,15 +621,15 @@ timeout 20s qemu-system-riscv64 \
 | 后续集成评分 | 100/100，命令退出码 0 | C1 加入后，35/35、25/25、40/40 三项全部通过 |
 | 集成后正式内核运行 | 10 次 `100 ticks`，20 秒限制内退出码 0 | 正常初始化路径下也完成时钟统计和关机 |
 
-![B2 集成评分的异常与时钟项目通过](../../images/lab3_grade_illegal_timer_25_40.png)
+![B2 集成评分的异常与时钟项目通过](./images/lab3_grade_illegal_timer_25_40.png)
 
 **图 3：** 集成版本的 25 分异常项和 40 分持续时钟项均显示通过。
 
-![B2 完整评分达到 100 分](../../images/lab3_grade_total100.png)
+![B2 完整评分达到 100 分](./images/lab3_grade_total100.png)
 
 **图 4：** C1 合入后的完整评分结果为 100/100。图中包含 A、B、C 的协作结果，不全部归为 B 的单独实现成绩。
 
-![B2 正式内核时钟输出和关机测试](../../images/b2_shutdown_memory_check.png)
+![B2 正式内核时钟输出和关机测试](./images/b2_shutdown_memory_check.png)
 
 **图 5：** 正式内核启动后完成 Best-Fit 自检，继续输出 10 次时钟统计，并在测试终端中正常退出。
 
@@ -654,7 +654,7 @@ make grade DEFS=-Dsbadaddr=stval
 timeout 20s make qemu DEFS=-Dsbadaddr=stval
 ```
 
-上述命令的退出码均为 0。构建、反汇编、评分和启动日志见 `report/_work/logs/` 中的 `b3-` 文件，详细记录见 [B3 交叉复测记录](../../b3_retest_a.md)。
+上述命令的退出码均为 0。构建、反汇编、评分和启动日志见 `./_work/logs/` 中的 `b3-` 文件，详细记录见 [B3 交叉复测记录](./b3_retest_a.md)。
 
 **1. 内存初始化与 Best-Fit 自检**
 
@@ -674,11 +674,11 @@ B3 进一步对比 `trap.h` 的 `struct trapframe` 和 `trapentry.S` 的反汇�
 | 恢复通用寄存器 | 根据保存槽位依次恢复可写通用寄存器 |
 | 最后恢复栈指针 | 在其他帧访问结束后执行 `ld sp,16(sp)`，然后 `sret` 返回 |
 
-![B3 Trap 入口的保存现场与参数传递](../../images/b3_trap_entry_disassembly.png)
+![B3 Trap 入口的保存现场与参数传递](./images/b3_trap_entry_disassembly.png)
 
 **图 6：** 入口反汇编中保存现场后将当前 `sp` 交给 `a0`，再调用 C 层的 `trap()`。
 
-![B3 Trap 返回的寄存器和栈恢复](../../images/b3_trap_restore_disassembly.png)
+![B3 Trap 返回的寄存器和栈恢复](./images/b3_trap_restore_disassembly.png)
 
 **图 7：** 返回反汇编中先恢复相关寄存器和状态，最后恢复原始 `sp` 并执行 `sret`。
 
@@ -695,11 +695,11 @@ re-armed supervisor timer and repeated trap return: PASS (40/40)
 Total Score: 100/100
 ```
 
-![B3 上下文主测 35 分通过](../../images/lab3_grade_context_35.png)
+![B3 上下文主测 35 分通过](./images/lab3_grade_context_35.png)
 
 **图 8：** 重新执行的完整评分中，A 负责的 Trap 入口、寄存器恢复和断点 EPC 项通过，得分 35/35。
 
-![B3 完整集成评分结果](../../images/lab3_grade_total100.png)
+![B3 完整集成评分结果](./images/lab3_grade_total100.png)
 
 **图 9：** B3 复测时完整评分总分 100/100；本次 B3 的主要复测结论是 A 的 35 分项与内存基础通过，其余两项是同次集成运行结果。
 
