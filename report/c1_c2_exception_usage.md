@@ -62,7 +62,7 @@ Trap 链路依次完成上下文保存、C 层分发、异常处理、上下文�
 c2_root=$(mktemp -d /tmp/lab3-c2-reproduce.XXXXXX)
 cp -a code "$c2_root/code"
 python3 code/tools/inject.py "$c2_root/code"
-python3 report/_work/c2_extended.py "$c2_root/code"
+python3 report/_work/scripts/c2_extended.py "$c2_root/code"
 make -C "$c2_root/code" clean
 make -C "$c2_root/code" 'DEFS=-Dsbadaddr=stval -DGRADE_LAB3_ILLEGAL'
 (
