@@ -1,8 +1,20 @@
 # Lab3 提示词汇总
 
-<!-- 原始来源：report/_work/prompts/ziqiu.md -->
+本文件汇总当前分支三名成员的提示词、规格及已有执行修正记录。沿用 Lab2 的四段式规格模板；Lab2 仅作为排版参考，正文均取自本分支。A 组含实际执行与修正记录；B 组保留问题与规格记录；C 组为按最终规格整理的示例，不将其视作逐字对话。提示词中的旧路径、阶段约束和“不要提交”等操作要求属于历史记录，不代表当前整理任务的要求。
 
-# 模板
+- [通用模板](#prompt-template)
+- [A：王子楸，A1/A2/A3/A4](#prompts-a)
+- [B：甘文杰，B1/B2/B3](#prompts-b)
+- [C：向宇航，C1/C2/C3](#prompts-c)
+- [本次报告整理的实际指令](#prompts-report)
+
+当前实验过程与结果见 [实验报告](./report.md)。原 `report/_work/logs/`、`report/_work/scripts/` 已分别归档至 `report/logs/`、`report/scripts/`；历史提示词保留原路径。A1/A2 早期已清理的日志、JSON 和辅助脚本没有重新生成，也不能作为现存证据引用。A3 第一轮评分的现存日志为 [a3a4-grade.log](./logs/a3a4-grade.log)，A4 第二轮未另存日志。
+
+<a id="prompt-template"></a>
+
+## 通用模板
+
+```text
 [PROMPT]
 做什么、改哪里、怎么改
 
@@ -38,13 +50,17 @@ Case 1、Case 2……：在Post-Condition下面，按照不同的执行情况分
 Requirements：特殊的时序要求、并发约束、性能要求，或者其他特殊需求。
 
 其中，Case和Requirements都是可选的，是否使用应根据具体函数的实际情况决定。如果函数只有单一执行路径或不存在需要单独描述的特殊执行路径，不需要设置Case；如果函数没有额外的特殊要求，不需要设置Requirements。
-
+```
 
 ---
 
-# Lab3 A1：Lab2 内存管理依赖回填与基础自检提示词
+<a id="prompts-a"></a>
 
-## [PROMPT]
+## A：王子楸（2412712）
+
+### Lab3 A1：Lab2 内存管理依赖回填与基础自检提示词
+
+#### [PROMPT]
 
 任务：参考小组已经完成的 Lab2 实现，将物理内存初始化和 Best-Fit 分配器接入 Lab3 新框架，完成 A1 的内存基础自检，为后续 A2 的 Trap 入口与上下文恢复提供可用的内存管理基础。
 
@@ -67,9 +83,9 @@ Requirements：特殊的时序要求、并发约束、性能要求，或者其�
 
 实际执行本提示词后，再将使用过的 Prompt、追加约束和真实修正过程补入仓库 `report/prompt.md` 的 A1 小节，保留现有模板和内容。没有运行的检查、环境阻塞和后续模块依赖必须如实标注。
 
-## [RELY]
+#### [RELY]
 
-### 阅读顺序与参考来源
+##### 阅读顺序与参考来源
 
 先阅读当前 Lab3 文件：
 
@@ -95,7 +111,7 @@ git show lab2:report/prompt.md
 - [Lab3 练习：开头的 Lab2 依赖说明](http://127.0.0.1:8000/lab2026/_book/lab3/lab3_2_1_exercise.html)。
 - [Lab3：中断的关闭和开启](http://127.0.0.1:8000/lab2026/_book/lab3/lab3_3_5_atomic.html)。
 
-### 当前框架的关键事实
+##### 当前框架的关键事实
 
 1. `kern_init()` 在清零 BSS 后调用 `dtb_init()`，随后调用 `pmm_init()`。PMM 内部顺序为 `init_pmm_manager()` → `page_init()` → `check_alloc_page()`，最后设置并输出启动页表的虚拟、物理地址。保留这个顺序。
 2. `init_pmm_manager()` 当前仍选择 `default_pmm_manager`；仅回填 Best-Fit 文件不会使内核使用该算法，必须完成本次管理器切换。
@@ -106,7 +122,7 @@ git show lab2:report/prompt.md
 7. `alloc_pages()`、`free_pages()`、`nr_free_pages()` 已在调用管理器前保存并关闭本 hart 中断，调用后按原状态恢复。原本关闭的中断不能被无条件开启；本次沿用现有保护，不扩展为多 hart 分配器。
 8. 可调用 `get_memory_base()`、`get_memory_size()`、`init_memmap()`、`pa2page()`、`set_page_ref()`、链表接口、页面状态宏、`assert()`、`panic()` 和 `cprintf()`，使用工程现有签名。
 
-## [GUARANTEE]
+#### [GUARANTEE]
 
 在 `pmm.c` 中实现或最小修改：
 
@@ -131,16 +147,16 @@ const struct pmm_manager best_fit_pmm_manager;
 
 现有 `basic_check()`、`best_fit_check()` 和 `check_alloc_page()` 作为验证依赖保留，不重新实现、不删除断言、不改变预期。
 
-## [SPECIFICATION]
+#### [SPECIFICATION]
 
-### 统一状态约定
+##### 统一状态约定
 
 1. Best-Fit 使用按页面地址递增排列的双向空闲链表，每个空闲连续块只链接首页；首页设置 `PageProperty`，其 `property` 为块页数。其他页不能残留会被识别为空闲块首页的标记。
 2. `nr_free` 表示空闲页总数，等于链表所有空闲块页数之和。一个页面不能被重复管理，已分配区与空闲区互不重叠，保留页不能被分配。
 3. 申请 `n` 页实际占用恰好 `n` 页。允许按框架固定测试释放已分配连续区间中的合法子区间；不使用 Buddy 的二次幂取整或“只能按原始请求长度整块释放”的契约。
 4. 本次沿用 Lab2 的合法调用约定：登记和释放区间合法且不重叠，长度大于零；保留原有断言。无需新增一套分配历史表或非法调用测试系统。
 
-### page_init
+##### page_init
 
 Pre-Condition：当前内核直接映射已建立；DTB 解析流程已执行，但查询结果仍需校验；当前 PMM 已初始化为空管理状态，尚未登记真实空闲页。
 
@@ -158,7 +174,7 @@ Case 5：描述符能够建立，但已无剩余完整页。保持描述符与�
 
 Requirements：使用依赖全局状态的转换接口前先建立相应状态；不能把 `npage` 当作描述符数量分配数组；先初始化全部保留描述符，再登记空闲页；不直接操作 Best-Fit 内部链表代替 `init_memmap()`。
 
-### init_pmm_manager
+##### init_pmm_manager
 
 Pre-Condition：内核正在初始化物理内存管理，尚未由 `page_init()` 登记空闲页。
 
@@ -166,13 +182,13 @@ Post-Condition：`pmm_manager` 指向 `best_fit_pmm_manager`，保留真实管�
 
 Requirements：只做管理器选择的必要修改，不迁入 Lab2 的 Buddy 测试入口及 `PMM_USE_*` 分支，不改变 `pmm_init()` 的后续流程。
 
-### best_fit_init
+##### best_fit_init
 
 Pre-Condition：首次初始化管理器，真实空闲页尚未登记。
 
 Post-Condition：初始化私有空闲链表，`nr_free` 为零；不访问尚未建立的 `pages` 数组，不分配动态内存。
 
-### best_fit_init_memmap
+##### best_fit_init_memmap
 
 Pre-Condition：管理器和描述符数组已初始化；`n > 0`，`[base, base + n)` 为合法、尚未登记的保留页区间。
 
@@ -180,7 +196,7 @@ Post-Condition：初始化区间内的页面状态和引用计数，将首页组
 
 Requirements：保留对传入页保留状态的断言。初始化阶段与 `page_init()` 配合，不重复登记、不把描述符自身占用空间加入空闲区。
 
-### best_fit_alloc_pages
+##### best_fit_alloc_pages
 
 Pre-Condition：管理器已初始化，`n > 0`，空闲链表及计数满足状态约定。
 
@@ -192,7 +208,7 @@ Case 2：总空闲页数不足，或总量足够但没有满足长度的连续�
 
 Requirements：保持真正的 Best-Fit 选择规则。不能直接使用 First-Fit 实现来代替，也不能将任意非零 `property` 值当作空闲首页的依据。
 
-### best_fit_free_pages
+##### best_fit_free_pages
 
 Pre-Condition：`n > 0`，传入区间位于有效页面范围内，全部为合法已分配、尚未释放的页；允许固定测试使用的合法子区间释放。
 
@@ -204,13 +220,13 @@ Case 2：与前块、后块或两侧均相邻。依次完成所需合并，合�
 
 Requirements：相邻依据页面地址与块长度判断，链表相邻本身不足以合并；不跨保留区或已分配区合并；合并不能重复增加 `nr_free` 或造成节点重复入链。
 
-### best_fit_nr_free_pages
+##### best_fit_nr_free_pages
 
 Pre-Condition：管理器已初始化。
 
 Post-Condition：返回真实空闲页总数，不修改管理状态，不把空闲块数量当作页数。
 
-### 固定自检与中断保护
+##### 固定自检与中断保护
 
 Pre-Condition：Best-Fit 已被选中，`page_init()` 已建立合法空闲区，默认内存配置足以执行框架自检。
 
@@ -218,7 +234,7 @@ Post-Condition：现有 `basic_check()`、`best_fit_check()` 通过，`check_all
 
 Requirements：保留两个固定自检的函数体、断言及评分输出。不得用只打印成功、调用 First-Fit 检查或检查注册指针代替算法自检。核对 `alloc_pages()`、`free_pages()`、`nr_free_pages()` 的原有中断保护保持完整；A1 的内存自检不能证明后续 Trap 进入与返回已经正确。
 
-### 编译、运行与交付
+##### 编译、运行与交付
 
 1. 在 WSL 的实际仓库 `code` 目录先执行 `make clean`、`make`，保留真实构建结果。检查 Best-Fit 管理器能够链接，旧版宏引用和未定义符号已消除；工具链问题如实记录，不修改无关模块迎合环境。
 2. QEMU 使用已安装的 4.1.1：`/home/catalpa/.local/opt/qemu-4.1.1/bin/qemu-system-riscv64`。确认路径与版本后执行：
@@ -235,7 +251,7 @@ Requirements：保留两个固定自检的函数体、断言及评分输出。�
 7. 在 `report/a1_memory_usage.md` 记录：Lab3 基线和迁入的 Lab2 提交、修改清单、地址推导与描述符布局、保留区和空闲页核对、中断保护保留情况、环境与命令、日志位置、真实结果及后续依赖。实际执行后补充 `report/prompt.md` 的 A1 记录，保留原有内容和修正过程。
 8. 交付前检查最终差异：仅包含 A1 的两个实现文件和相关文档，正式启动流程、Trap 代码、固定测试及公共结构未被修改；没有遗留测试暂停、临时代码副本或无关改动。提供可供 B 后续独立复测的步骤，不提前宣称复测已完成。
 
-## 本次执行与修正记录
+#### 本次执行与修正记录
 
 执行日期：2026-11-03。个人分支：`work/lab3/ziqiu`。
 
@@ -248,14 +264,14 @@ Requirements：保留两个固定自检的函数体、断言及评分输出。�
 - 对比基线确认两个固定自检和三个带中断保护的公共包装函数保持不变。无效 DTB、超出管理上界、尾页对齐、描述符空间不足及无剩余空闲页等分支完成代码核查，未注入这些异常场景运行，不将其描述为运行通过。
 - 本次没有提交、推送或合并代码。完整 Lab3 评分及中断、异常功能等待 A2、B、C；B 的独立复测尚待执行。
 
-实际修改、内存布局、边界核查、复现命令和证据索引见 [A1 内存管理记录](./a1_memory_usage.md)。源码文件哈希及修改范围见 `report/logs/a1_source_check.json`。
+实际修改、内存布局、边界核查、复现命令和证据索引见 [A1 内存管理记录](./report.md#process-a1)。源码文件哈希及修改范围见 `report/logs/a1_source_check.json`。
 
 
 ---
 
-# Lab3 A2：Trap 入口与上下文恢复实现提示词
+### Lab3 A2：Trap 入口与上下文恢复实现提示词
 
-## [PROMPT]
+#### [PROMPT]
 
 任务：补全 Lab3 的 Trap 入口和上下文恢复，使当前框架形成“Trap 进入 → 保存上下文 → 调用 C 语言处理函数 → 恢复上下文 → 返回原执行流”的完整链路。
 
@@ -276,9 +292,9 @@ Requirements：保留两个固定自检的函数体、断言及评分输出。�
 
 实际执行本提示词后，再将使用过的 Prompt 和必要的修正过程追加到 `report/prompt.md` 的 A2 小节，保留原有模板及 A1 记录。未执行的验证和未就绪的依赖如实注明。
 
-## [RELY]
+#### [RELY]
 
-### 源码与已有状态
+##### 源码与已有状态
 
 先阅读：
 
@@ -300,7 +316,7 @@ A1 已在当前工作区回填 `page_init()` 和 Best-Fit，并完成内存自�
 - [中断入口点](http://127.0.0.1:8000/lab2026/_book/lab3/lab3_3_2_trapentry.html)。
 - [中断处理程序](http://127.0.0.1:8000/lab2026/_book/lab3/lab3_3_3_trap.html)。
 
-### Trap frame 的实际布局
+##### Trap frame 的实际布局
 
 当前目标为 RISC-V64，`REGBYTES` 为 8。`SAVE_ALL` 在当前栈上建立 36 个寄存器宽度的帧，共 288 字节。以下槽位必须与 `trap.h` 一致；实现使用现有宏，避免另建一套偏移定义。
 
@@ -325,7 +341,7 @@ void trap(struct trapframe *tf);
 
 按 RISC-V 调用约定，首个参数通过 `a0` 传递；调用 C 函数时栈保持 16 字节对齐。当前 288 字节的帧大小保持入口已有的栈对齐。
 
-## [GUARANTEE]
+#### [GUARANTEE]
 
 必须补全以下现有汇编接口：
 
@@ -336,9 +352,9 @@ void trap(struct trapframe *tf);
 
 已有 `SAVE_ALL`、`__trapret` 和 C 层 `trap()` 是本次依赖，不重新实现。保留原有 `sret`；`RESTORE_ALL` 完成恢复后由该指令执行特权级返回。
 
-## [SPECIFICATION]
+#### [SPECIFICATION]
 
-### __alltraps
+##### __alltraps
 
 Pre-Condition：处理器已因 Trap 进入当前入口，当前内核栈可用，并满足现有框架的栈对齐约定；入口中的 `SAVE_ALL` 保持原样。
 
@@ -351,7 +367,7 @@ Requirements：
 - C 调用可能覆盖 `ra`、参数寄存器和临时寄存器，后续恢复依赖帧中的保存值；不能假设这些寄存器跨 C 调用保持不变。
 - 中断与异常共用此入口，分类及具体处理交给已有 C 层。入口不判断异常指令长度，不自行推进 `epc`。
 
-### RESTORE_ALL
+##### RESTORE_ALL
 
 Pre-Condition：`trap()` 已正常返回，当前 `sp` 指向符合上述布局的有效 Trap frame；C 处理函数对帧所做的合法更新已经完成。
 
@@ -370,7 +386,7 @@ Requirements：
 - `sret` 会按体系结构规则更新 `SIE`、`SPIE`、`SPP`，不能将返回后的这些位与帧中值简单作逐位相等判断。
 - `badvaddr`、`cause` 用于诊断与分派，无需在返回时写回相应 CSR；沿用 `SAVE_ALL` 建立的 `sscratch` 约定。
 
-### 构建与必要验证
+##### 构建与必要验证
 
 1. 完成后做一次干净构建，并检查实际指令与帧布局、参数传递和 `sp` 恢复顺序相符。沿用 A1 已确认的工具链兼容参数，保留 `SAVE_ALL` 中的旧 CSR 名称：
 
@@ -391,13 +407,13 @@ Requirements：
 5. 若 C 仍为占位，记录“返回链路的运行验证依赖 C 的真实处理函数”，完成本次实现、构建和必要源码核对即可，不为获得通过标记擅自补写 C 的任务。若发现具体错误，再针对该错误检查和重测；不反复执行相同验证，不重跑 A1 的全量描述符检查或无关评分项。
 6. 现有上下文测试检查了一组寄存器，不能据此宣称所有通用寄存器、所有特权级和嵌套场景均已动态覆盖。正式 35 分主测按 A3 分工记录；40 分时钟、25 分异常与兜底及完整 100 分验收留待相应模块就绪。
 
-### 交付
+##### 交付
 
 `report/a2_trap_usage.md` 简要说明两个修改点、帧与寄存器的对应关系、C 调用前后的栈状态，以及必要验证的命令、结果和限制。实际使用的提示词与修正过程追加到 `report/prompt.md`。
 
 交付前检查本次新增差异仅涉及 `trapentry.S` 的两个待填位置和 A2 文档，A1 与其他成员代码、固定测试及正式启动流程保持原样。未运行的项目明确说明，不将依赖占位造成的失败归为已经通过。
 
-## 本次执行与修正记录
+#### 本次执行与修正记录
 
 执行日期：2026-11-03。个人分支：`work/lab3/ziqiu`。用户执行指令：“OK，按照这个提示词去完成A2吧”。沿用此前“避免防御性编程和过度验证”的要求。
 
@@ -406,10 +422,10 @@ Requirements：
 - 实现未增加额外运行时检查、上下文结构或测试框架，未修改 A1、C 层处理、公共结构体、初始化流程、固定测试或构建规则。
 - 使用 WSL 工具链执行一次 `make clean` 和 `make DEFS=-Dsbadaddr=stval`，完整构建通过；检查反汇编，确认实际参数传递、CSR 与通用寄存器槽位、最后恢复 `sp` 和执行 `sret` 的顺序正确。沿用兼容参数，未修改 `SAVE_ALL` 中的旧 CSR 名称。
 - 当前 C 的断点处理尚未实现，本次没有运行需要其正常返回的上下文测试，也没有构造替身或重复执行无关检查。动态返回验证及 A3 的 35 分主测等待 C 的真实异常处理；本次未启动 QEMU，后续运行仍要求显式使用 QEMU 4.1.1。
-- 本次没有提交、推送或合并。实现说明、必要命令和验证限制见 [A2 Trap 入口与上下文恢复记录](./a2_trap_usage.md)。
+- 本次没有提交、推送或合并。实现说明、必要命令和验证限制见 [A2 Trap 入口与上下文恢复记录](./report.md#process-a2)。
 
 
-## 提交整理记录（2026-11-03）
+#### 提交整理记录（2026-11-03）
 
 用户授权将当前 A1、A2 实现提交并推送至个人分支 `work/lab3/ziqiu`。
 
@@ -420,9 +436,9 @@ Requirements：
 
 ---
 
-# Lab3 A3+A4：上下文主测与异常复测提示词
+### Lab3 A3+A4：上下文主测与异常复测提示词
 
-## [PROMPT]
+#### [PROMPT]
 
 任务：基于当前已经合入 A、B、C 实现的 Lab3 代码，由 A 完成 A3“Trap 入口、寄存器恢复与断点返回”35 分项主测，以及 A4 对 C“非法指令与兜底”25 分项的独立复测，记录真实结果和简要解释。
 
@@ -443,7 +459,7 @@ Requirements：
 
 输出要求：说明测试所用版本、环境和命令、A3 的 35 分结果、A4 的 25 分复测结果、总评分及必要解释。未执行或失败的项目如实记录。结果通过后完成文档即可，不为了增加验证数量重复运行。
 
-## [RELY]
+#### [RELY]
 
 先阅读以下相关部分：
 
@@ -464,7 +480,7 @@ Requirements：
 6. C 的历史记录已有 100/100，其中上下文项为 35/35；本次仍需独立运行。
 7. A4 按分工独立复测 25 分项。评分要求非法指令返回 PASS、`Illegal instruction at`、`Supervisor software interrupt`、`Unknown interrupt: cause 15` 以及 cause 20 的 Trap frame 输出。
 
-## [GUARANTEE]
+#### [GUARANTEE]
 
 实际使用并保留以下已有测试接口：
 
@@ -475,9 +491,9 @@ void test_lab3_exception_context(void);
 
 本次不需要新增内核函数。交付为真实评分结果、`report/a3_a4_test.md` 和个人 Prompt 追加记录；报告需要图片时，保留一张本次真实结果的截图到 `report/images/a3_a4_grade.png`，不为截图重复运行测试。历史复测若按用户要求未保存日志，应保留这一事实，只补记实际结果。
 
-## [SPECIFICATION]
+#### [SPECIFICATION]
 
-### 现有上下文与断点测试
+##### 现有上下文与断点测试
 
 Pre-Condition：使用当前集成代码，A2 的汇编入口与恢复、C 的真实断点处理均可用；评分注入和用例选择由现有工具完成。
 
@@ -489,7 +505,7 @@ Case 2：测试失败。保留原始输出，先区分构建、启动、断点�
 
 Requirements：不改动测试函数、比较值或通过条件；不额外构造完整寄存器测试或 16/32 位异常组合测试。
 
-### A4：非法指令与兜底复测
+##### A4：非法指令与兜底复测
 
 Pre-Condition：C 的真实异常处理及 B 的中断兜底依赖已就绪，使用原有 `GRADE_LAB3_ILLEGAL` 用例，由 A 独立构建并运行。
 
@@ -497,7 +513,7 @@ Post-Condition：非法指令处理后继续执行，软件中断、未知中断
 
 Requirements：按现有 25 分项范围复测即可，解释各输出对应的分支；发现具体错误再处理，不额外扩展测试矩阵。
 
-### 评分环境与执行
+##### 评分环境与执行
 
 Pre-Condition：在 WSL 登录环境的实际 `code` 目录工作，RISC-V 工具链可用。
 
@@ -519,7 +535,7 @@ make grade CC='riscv64-unknown-elf-gcc -Dsbadaddr=stval' 2>&1 | tee ../report/_w
 
 Requirements：保留现有 BIOS 和镜像加载方式。使用 `pipefail` 保留评分失败状态，不能将 `tee` 成功当成测试通过。评分成功时会清理临时副本，控制台日志是本次保留的评分证据；如因失败留下副本，定位问题后仅清理本次创建的临时内容。
 
-### 结果说明与交付
+##### 结果说明与交付
 
 Pre-Condition：本次评分已完成，或已经获得明确的实际失败原因。
 
@@ -535,35 +551,34 @@ Requirements：现有用例显式比较 26 个寄存器，不能将通过结果�
 
 A3 的 35 分主测与 A4 的 25 分复测按上述要求通过后，记录两项完成。40 分结果作为附带集成结果，不据此宣称其他成员交叉复测或共同终审完成。保留原有成员资料，将更新规格和实际结果记录到 `report/_work/prompts/ziqiu.md`，不重建旧的 `report/prompt.md`。
 
-## 材料归档说明（2026-11-04）
+#### 材料归档说明（2026-11-04）
 
 第一轮评分日志原名为 `a3-grade.log`，现存材料文件名为 `report/_work/logs/a3a4-grade.log`；以上提示词中的历史文件名保留原文。第二轮 A4 复测未另存日志，现存日志仍对应第一轮评分。报告截图统一使用 `.png` 后缀。
 
-
 ---
 
-<!-- 原始来源：report/_work/prompts/wenjie.md -->
+<a id="prompts-b"></a>
 
-# Lab3 B1/B2/B3：Prompt
+## B：甘文杰（2412700）
 
-## 前置问题 1：先弄清楚 Lab3 到底要完成什么
+### 前置问题 1：先弄清楚 Lab3 到底要完成什么
 
-### [PROMPT]
+#### [PROMPT]
 
 我想先把这次实验的整体任务弄明白，不急着看某一个函数。能不能从内核启动开始，按实际运行顺序带我梳理一下：内存初始化、设置 Trap 入口、初始化时钟、开启中断分别在做什么？A、B、C 三个人的代码最后又是怎么连起来的？先说明主线，再讲每个人负责的部分和测试依赖。
 
-### [RELY]
+#### [RELY]
 
 - `report/任务分工.md` 中 A1—A4、B1—B4、C1—C3 的职责和测试依赖。
 - `code/kern/init/init.c` 中 `kern_init()` 的执行顺序。
 - `code/kern/mm/pmm.c`、`code/kern/trap/trap.c`、`code/kern/trap/trapentry.S`、`code/kern/driver/clock.c`。
 - 当前实验的三项主测：A 的 35 分、B 的 40 分、C 的 25 分。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 本次只讨论和解释，不修改文件。输出一份按时间顺序组织的启动流程，并说明三个成员的实现是怎样相互依赖的。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：以当前仓库中的 Lab3 工程为起点，假设我只知道内核可以由 QEMU 启动，还没有完全理解 Trap 的执行过程。
 
@@ -577,24 +592,24 @@ Case 3：解释为什么 35 分测试需要断点异常处理，40 分测试需�
 
 Requirements：重点解释“为什么先做这一步，以及它给后一步提供了什么”，暂时忽略与主线无关的底层细节。
 
-## 前置问题 2：一次 Trap 发生以后，CPU 和内核分别做了什么
+### 前置问题 2：一次 Trap 发生以后，CPU 和内核分别做了什么
 
-### [PROMPT]
+#### [PROMPT]
 
 我现在知道大概的初始化顺序了，但还有一个疑问：程序本来正在执行，为什么发生中断以后就能跑到我们写的 C 函数？处理完又为什么能回到原来的位置？
 
-### [RELY]
+#### [RELY]
 
 - `code/kern/trap/trapentry.S` 的 `SAVE_ALL`、`__alltraps`、`RESTORE_ALL`、`sret`。
 - `code/kern/trap/trap.h` 的 `struct pushregs` 与 `struct trapframe`。
 - `code/kern/trap/trap.c` 的 `idt_init()`、`trap()`、`trap_dispatch()`、`interrupt_handler()`、`exception_handler()`。
 - `code/kern/driver/intr.c` 的中断开关函数。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 不修改代码。给出从触发到返回的完整调用与状态变化过程，并区分硬件自动记录的状态、软件保存的寄存器和 C 函数读取或修改的信息。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：`stvec` 已设置到 `__alltraps`，内核正在正常执行，并且时钟中断已经开启。
 
@@ -608,24 +623,24 @@ Case 3：对比时钟中断与断点异常。前者通常从被打断的位置�
 
 Requirements：不要只解释函数名；每一步要说明此时 `sp`、Trap frame 和返回地址处在什么状态。
 
-## 前置问题 3：先搞清楚实验怎么测试，再决定怎么检查自己的任务
+### 前置问题 3：先搞清楚实验怎么测试，再决定怎么检查自己的任务
 
-### [PROMPT]
+#### [PROMPT]
 
 同一个实验会分成 35、25、40 三组测试，直接运行 `make grade` 后，脚本是怎么分别检查这三组内容的？
 
 请你结合实际脚本解释构建、注入测试、启动 QEMU、读取串口输出、判断 PASS 的过程。
-### [RELY]
+#### [RELY]
 
 - `code/Makefile`、`code/tools/grade.sh`、`code/tools/inject.py`。
 - `code/tools/test_lab3.c`、`code/tools/test_lab3_context.S`。
 - `report/任务分工.md` 的主测与交叉复测要求。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 只分析测试，不修改评分脚本和源码。输出三项测试各自的触发方式、检查条件、依赖模块与能证明的范围。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：A、B、C 的相关实现已存在，可以在具备 RISC-V 工具链和 QEMU 的环境中执行评分。
 
@@ -639,22 +654,22 @@ Case 3：分析 `GRADE_LAB3_TIMER`：为什么需要连续达到 200 次时钟�
 
 Requirements：说明超时、正常退出、脚本匹配输出三者的区别。不要把同一次完整评分自动等同于每个成员都完成了独立复测。
 
-## B1 问题 1：中断处理函数是怎么区分类型的
+### B1 问题 1：中断处理函数是怎么区分类型的
 
-### [PROMPT]
+#### [PROMPT]
 
 我负责的是 B1，也就是 `interrupt_handler()`。我现在的理解是：Trap 入口已经由 A 保存好现场，传到 C 代码以后，我应该只负责判断中断类型并执行对应操作，不需要再保存一遍寄存器。
 
 请你结合代码说明 `tf->cause` 从哪里来，为什么要把 `scause` 的最高位和后面的原因编号分开，以及 `IRQ_S_TIMER`、`IRQ_S_SOFT` 和未知中断分别应该怎么处理。尤其是 `trap_dispatch()` 已经区分了中断与异常，为什么进入 `interrupt_handler()` 后仍要取出编号？
 
-### [RELY]
+#### [RELY]
 
 - `code/kern/trap/trap.c` 中 `trap_dispatch()`、`interrupt_handler()`、`print_trapframe()`。
 - `code/kern/trap/trap.h` 中 `struct trapframe`。
 - `code/libs/riscv.h` 中相关中断编号和 CSR 定义（以仓库实际文件为准）。
 - A 的 `__alltraps` 和 C 的 `exception_handler()` 已分别负责现场链路与异常路径。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 本次先解释 B1 的设计和现有实现，不修改 A、C 代码。重点核对下面的接口及它的分支行为。
 
@@ -662,7 +677,7 @@ Requirements：说明超时、正常退出、脚本匹配输出三者的区别�
 void interrupt_handler(struct trapframe *tf);
 ```
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：`tf` 指向 Trap 入口保存的有效现场，当前调用由 `trap_dispatch()` 判定为中断。
 
@@ -676,22 +691,22 @@ Case 3：其他中断。输出 `Unknown interrupt: cause N`，调用 `print_trap
 
 Requirements：区分 `tf->cause` 原始值和去掉中断标记后的原因编号；不要把中断原因编号与异常原因编号混为一谈。
 
-## B1 问题 2：为什么时钟中断里还要设置下一次事件
+### B1 问题 2：为什么时钟中断里还要设置下一次事件
 
-### [PROMPT]
+#### [PROMPT]
 
 我有一个实现上的疑问：`clock_init()` 已经调用过 `clock_set_next_event()`，为什么每次进入时钟中断以后还要再调用一次？
 
 请你从 `clock_set_next_event()` 的具体代码出发解释时钟是怎样工作的。然后帮我检查 B1 当前的处理顺序：先预约下一次事件，再计数，每 100 次输出一次，达到 1000 次后关机。
 
-### [RELY]
+#### [RELY]
 
 - `code/kern/driver/clock.c` 的 `clock_init()`、`clock_set_next_event()` 和 `ticks`。
 - `code/kern/trap/trap.c` 的 `TICK_NUM`、`TICK_SHUTDOWN_NUM`、`print_ticks()`、`interrupt_handler()`。
 - `code/libs/sbi.c` 与相关头文件中的 `sbi_set_timer()`、`sbi_shutdown()`。
 - `code/tools/test_lab3.c` 的时钟测试与 `report/b1_b2_interrupt_usage.md`。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 不新增功能。对照源码解释下列已有接口之间的配合关系。
 
@@ -701,7 +716,7 @@ void clock_set_next_event(void);
 void interrupt_handler(struct trapframe *tf);
 ```
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：启动期间已经完成 `clock_init()`，中断开关允许处理时钟事件，`ticks` 从零开始。
 
@@ -715,24 +730,24 @@ Case 3：现有 B1 实现将 `TICK_SHUTDOWN_NUM` 设为 `TICK_NUM * 10`，在第
 
 Requirements：结合真实时序说明。不能把“输出 PASS (40/40, ticks=200)”误解为 QEMU 已经正常关机。
 
-## B2 问题 1：40 分时钟测试应该如何判断是否真正通过
+### B2 问题 1：40 分时钟测试应该如何判断是否真正通过
 
-### [PROMPT]
+#### [PROMPT]
 
 B1 实现以后，我想检查它到底有没有连续工作。帮我看看 40 分评分的触发过程：测试程序在哪里等待 `ticks` 到 200，评分脚本又需要匹配什么输出？
 
-### [RELY]
+#### [RELY]
 
 - `code/tools/test_lab3.c` 的 `test_lab3_timer_is_armed()`、`test_lab3_wait_for_timer()`。
 - `code/tools/grade.sh` 的 `GRADE_LAB3_TIMER` 与输出匹配条件。
 - `report/b1_b2_interrupt_usage.md` 和 `report/_work/logs/b2-grade.log`。
 - 现有构建环境可能需要 `-Dsbadaddr=stval` 的 CSR 兼容参数。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 只分析和指导核验，禁止为了拿分去修改评分脚本。给出可以直接复查的命令、预期输出及失败时的定位顺序。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：A 的 Trap 入口和 B 的时钟处理已可用，当前工作目录是仓库的 `code/`。
 
@@ -746,26 +761,26 @@ Case 3：如果 35 分或 25 分失败，查看失败发生在哪个测试分支
 
 Requirements：保留原始输出，不编造自己没有跑过的命令、得分或退出码。
 
-## B2 问题 2：需要怎样检查关机和兜底分支
+### B2 问题 2：需要怎样检查关机和兜底分支
 
-### [PROMPT]
+#### [PROMPT]
 
 我发现 40 分测试主要关注 `ticks` 能否到 200，但 B1 还有关机、软件中断和未知中断这些分支。仅靠评分 PASS 好像不能证明它们都正确执行了。
 
 我想把这些额外检查做清楚：一方面让内核继续运行到 1000 次，看 `sbi_shutdown()` 是否真的使 QEMU 退出；另一方面单独验证软件中断和未知中断的打印。帮我解释不同日志分别能说明什么。
 
-### [RELY]
+#### [RELY]
 
 - `code/kern/trap/trap.c` 的 B1 分支、`TICK_NUM`、`TICK_SHUTDOWN_NUM`。
 - `code/tools/inject.py`、`grade.sh`、`test_lab3.c`。
 - `report/b1_b2_interrupt_usage.md`。
 - `report/_work/logs/b2-timer-qemu.log`、`b1-fallback-qemu.log` 及对应构建日志。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 说明独立测试的设计与证据要求。正式源码、官方评分脚本和其他成员的实现不修改；如需补充测试，仅在 `/tmp` 的独立副本中进行。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：B1 的中断处理已经实现，基本时钟评分至少能跑到 200 次。
 
@@ -779,24 +794,24 @@ Case 3：未知中断。使用不属于当前已处理分支的中断编号，�
 
 Requirements：分别保存或指出日志来源。明确“官方评分”和“额外补测”不是同一项测试；未运行的补测只列为建议，不标记为通过。
 
-## B3 问题 1：复测 A 之前，我需要理解哪些代码
+### B3 问题 1：复测 A 之前，我需要理解哪些代码
 
-### [PROMPT]
+#### [PROMPT]
 
 现在准备做 B3，也就是复测 A 的 35 分项和内存基础。带我先看懂 A 的两条主线：第一条是内存从 DTB 信息变成可管理的空闲页，第二条是 `ebreak` 触发后，寄存器如何保存到 Trap frame，再被恢复。
 
-### [RELY]
+#### [RELY]
 
 - `code/kern/mm/pmm.c`、`best_fit_pmm.c`、`memlayout.h`、`pmm.h`。
 - `code/kern/trap/trapentry.S` 与 `trap.h`。
 - `code/tools/test_lab3_context.S` 和 `test_lab3.c`。
 - `report/a1_memory_usage.md`、`report/a2_trap_usage.md`、`report/a3_a4_test.md`。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 只对 A 的实现进行只读分析，不修改队友代码。输出两条可以独立跟踪的执行流程，并解释 35 分测试具体比较了什么。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：A1、A2 已有真实实现，C 的断点异常处理能够推进 `tf->epc`，这样断点测试才可以正常返回。
 
@@ -812,24 +827,24 @@ Case 4：35 分测试。测试汇编先给 26 个寄存器设置已知值，执�
 
 Requirements：区分“我本次复测 A 的代码”和“C 的异常处理是 35 分项的必要依赖”；不要把测试没有逐项比较的 `sp`、`ra` 说成已经被该用例直接逐值检查。
 
-## B3 问题 2：怎样独立复测并记录结果，才算完成交叉检查
+### B3 问题 2：怎样独立复测并记录结果，才算完成交叉检查
 
-### [PROMPT]
+#### [PROMPT]
 
 我已经完成了 B3 的操作，请你帮我按原始版本、编译命令、运行结果和实际覆盖范围整理检查思路。
 
-### [RELY]
+#### [RELY]
 
 - `report/任务分工.md` 的 B3 复测职责。
 - `report/a1_memory_usage.md`、`report/a2_trap_usage.md`、`report/a3_a4_test.md`，作为参考而不是本人的独立复测证据。
 - `code/tools/grade.sh`、`test_lab3_context.S` 和当前 `trapentry.S`。
 - 本人 B3 实际使用的提交号、测试命令、构建环境、QEMU 输出和日志（以运行时记录为准）。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 只协助核对和整理 B3 证据，不修改 A 的代码或官方测试。最终应形成一份有版本、命令、观察结果和结论的复测记录；未提供的数据保持待补充。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：A 已完成 A3 的 35 分主测，B 已自行执行 B3 复测，并且有可追溯的运行版本或输出。
 
@@ -847,16 +862,15 @@ Requirements：输出保持学生实际记录的口吻，清楚说明“我验�
 
 ---
 
-
 ---
 
-<!-- 原始来源：report/_work/prompts/yuhang.md -->
+<a id="prompts-c"></a>
 
-# Lab3 C1/C2： Prompt
+## C：向宇航（2413318）
 
-## C1：异常处理
+### C1：异常处理
 
-### [PROMPT]
+#### [PROMPT]
 
 任务：在 `code/kern/trap/trap.c` 中替换 `exception_handler()` 的占位实现，完成非法指令、断点和其他异常的处理。
 
@@ -864,7 +878,7 @@ Requirements：输出保持学生实际记录的口吻，清楚说明“我验�
 
 输出要求：说明异常分类、输出格式和 EPC 更新依据。先编译验证，再独立提交 C1 实现。
 
-### [RELY]
+#### [RELY]
 
 - `trap.h` 中的 `struct trapframe`，其中 `cause` 为异常原因，`epc` 为触发异常的指令地址。
 - `riscv.h` 中的 `CAUSE_ILLEGAL_INSTRUCTION`、`CAUSE_BREAKPOINT`。
@@ -872,13 +886,13 @@ Requirements：输出保持学生实际记录的口吻，清楚说明“我验�
 - A 已实现 Trap 保存与恢复，B 已实现中断处理。统一恢复流程会将修改后的 EPC 写回 `sepc`。
 - 本实验处理可读内核代码地址处的 16/32 位指令，使用指令首个半字的低两位区分长度。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 ```c
 void exception_handler(struct trapframe *tf);
 ```
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：`tf` 指向有效 Trap frame；需要跳过的异常指令地址可读，指令长度属于本实验的 16/32 位范围。
 
@@ -892,9 +906,9 @@ Case 3：其他异常。只调用 `print_trapframe(tf)`，不修改 EPC，不添
 
 Requirements：异常输出在 EPC 更新之前完成；不得将所有非法指令或断点的长度固定为同一个值。复用两个已处理分支的长度判断，保持实现简洁。
 
-## C2：异常与兜底验收
+### C2：异常与兜底验收
 
-### [PROMPT]
+#### [PROMPT]
 
 任务：在 C1 实现及 A、B 依赖具备的版本上，完成 C 的 25 分主测，并记录完整评分及必要的指令长度补充测试。
 
@@ -902,17 +916,17 @@ Requirements：异常输出在 EPC 更新之前完成；不得将所有非法指
 
 输出要求：交付 C1/C2 使用记录、可复现的补充测试脚本与证据，更新 README 过时的占位提示，独立提交 C2 材料。
 
-### [RELY]
+#### [RELY]
 
 - `code/Makefile` 的 `grade` 入口及 `tools/inject.py`、`grade.sh`、`test_lab3.c`、`test_lab3_context.S`。
 - 本机 RISC-V 工具链和 QEMU；沿用 `DEFS=-Dsbadaddr=stval` 兼容定义。
 - 原始评分中的软件中断、未知中断和未知异常用例。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 交付 `report/c1_c2_exception_usage.md`、测试日志及可复现补充测试脚本。生产代码不增加测试接口。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：C1 实现已提交，A 的内存和 Trap 链路、B 的中断处理均可用。
 
@@ -926,9 +940,9 @@ Case 3：兜底。构造未知异常并直接调用 handler，确认打印后返
 
 Requirements：检查失败时保留证据并定位原因。只修复 C1 范围内的缺陷；依赖模块的问题归属对应成员。未执行的工作不描述为通过。
 
-## C3：独立复测 B 的持续时钟与关机
+### C3：独立复测 B 的持续时钟与关机
 
-### [PROMPT]
+#### [PROMPT]
 
 任务：从已合入 A、B、C 实现的 `lab3` 基线创建 `work/yuhang/c3`，由向宇航（2413318）独立复测 B 的持续时钟及正常关机。
 
@@ -936,18 +950,18 @@ Requirements：检查失败时保留证据并定位原因。只修复 C1 范围�
 
 输出要求：保存命令、环境、基线、完整日志、退出状态和耗时，保留手动复现的真实终端截图，编写 C3 复测报告，创建一个独立测试提交。不推送或合并。
 
-### [RELY]
+#### [RELY]
 
 - `interrupt_handler()`、`clock_set_next_event()`、`ticks`、`TICK_NUM` 和 `TICK_SHUTDOWN_NUM` 的现有实现。
 - `clock_init()`、`intr_enable()` 与 `sbi_shutdown()` 提供的初始化、时钟使能和关机链路。
 - 原始 `tools/inject.py`、`test_lab3.c` 与 `GRADE_LAB3_TIMER` 用例。
 - RISC-V 工具链、QEMU 和 `-Dsbadaddr=stval` 兼容参数。
 
-### [GUARANTEE]
+#### [GUARANTEE]
 
 交付 `report/c3_retest_b.md`、可复现脚本、日志、状态记录及报告引用的真实终端截图。生产代码不增加接口。
 
-### [SPECIFICATION]
+#### [SPECIFICATION]
 
 Pre-Condition：固定基线包含 A、B、C 的功能实现，使用有效工具链，两个测试副本均从 Git 提交导出并执行干净构建。
 
