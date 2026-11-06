@@ -11,10 +11,10 @@ import tempfile
 import time
 
 BASELINE = '222162ce44b2cd84a9fa854a192a006c618ee7c1'
-REPO = Path(__file__).resolve().parents[3]
+REPO = Path(__file__).resolve().parents[2]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--baseline', default=BASELINE)
-parser.add_argument('--output', type=Path, default=REPO / 'report/_work/logs')
+parser.add_argument('--output', type=Path, default=REPO / 'report/logs')
 args = parser.parse_args()
 logs = args.output.resolve()
 logs.mkdir(parents=True, exist_ok=True)
