@@ -74,7 +74,7 @@ void print_pgdir(void);
     ({                                                           \
         uintptr_t __m_pa = (pa);                                 \
         size_t __m_ppn = PPN(__m_pa);                            \
-        if (__m_ppn >= npage)                                    \
+        if (__m_ppn < nbase || __m_ppn >= npage)                 \
         {                                                        \
             panic("KADDR called with invalid pa %08lx", __m_pa); \
         }                                                        \
@@ -88,23 +88,41 @@ extern uint_t va_pa_offset;
 static inline ppn_t
 page2ppn(struct Page *page)
 {
-    return page - pages + nbase;
+    uintptr_t page_addr = (uintptr_t)page;
+    uintptr_t pages_addr = (uintptr_t)pages;
+    if (pages == NULL || npage < nbase || page_addr < pages_addr)
+    {
+        panic("page2ppn called with invalid page");
+    }
+    uintptr_t offset = page_addr - pages_addr;
+    size_t page_index = offset / sizeof(struct Page);
+    if (offset % sizeof(struct Page) != 0 || page_index >= npage - nbase)
+    {
+        panic("page2ppn called with invalid page");
+    }
+    return page_index + nbase;
 }
 
 static inline uintptr_t
 page2pa(struct Page *page)
 {
-    return page2ppn(page) << PGSHIFT;
+    ppn_t ppn = page2ppn(page);
+    if (ppn < nbase || ppn >= npage)
+    {
+        panic("page2pa called with invalid page");
+    }
+    return ppn << PGSHIFT;
 }
 
 static inline struct Page *
 pa2page(uintptr_t pa)
 {
-    if (PPN(pa) >= npage)
+    ppn_t ppn = PPN(pa);
+    if (pages == NULL || ppn < nbase || ppn >= npage)
     {
         panic("pa2page called with invalid pa");
     }
-    return &pages[PPN(pa) - nbase];
+    return &pages[ppn - nbase];
 }
 
 static inline void *
