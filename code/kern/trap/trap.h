@@ -49,6 +49,8 @@ struct trapframe
 };
 
 void trap(struct trapframe *tf);
+void interrupt_handler(struct trapframe *tf);
+void exception_handler(struct trapframe *tf);
 void idt_init(void);
 void print_trapframe(struct trapframe *tf);
 void print_regs(struct pushregs *gpr);

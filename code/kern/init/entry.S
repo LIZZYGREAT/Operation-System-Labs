@@ -32,8 +32,10 @@ kern_entry:
     # 从此，我们给内核搭建出了一个完美的虚拟内存空间！
     #nop # 可能映射的位置有些bug。。插入一个nop
     
-    # 我们在虚拟内存空间中：随意将 sp 设置为虚拟地址！
-    lui sp, %hi(bootstacktop)
+    # Set the complete virtual stack-top address before entering C code.
+    lui t1, %hi(bootstacktop)
+    addi t1, t1, %lo(bootstacktop)
+    mv sp, t1
 
     # 我们在虚拟内存空间中：随意跳转到虚拟地址！
     # 跳转到 kern_init
