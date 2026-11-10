@@ -336,6 +336,21 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
         return -E_INVAL;
     }
 
+    const pte_t leaf_permissions = PTE_R | PTE_W | PTE_X;
+    pde_t *pdep1 = &pgdir[PDX1(la)];
+    if (*pdep1 & PTE_V)
+    {
+        if (*pdep1 & leaf_permissions)
+        {
+            return -E_INVAL;
+        }
+        pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];
+        if ((*pdep0 & PTE_V) && (*pdep0 & leaf_permissions))
+        {
+            return -E_INVAL;
+        }
+    }
+
     pte_t *ptep = get_pte(pgdir, la, 1);
     if (ptep == NULL)
     {
@@ -468,15 +483,45 @@ static void check_pgdir(void)
 static void check_boot_pgdir(void)
 {
     size_t nr_free_store;
-    pte_t *ptep;
-    int i;
 
     nr_free_store = nr_free_pages();
 
-    for (i = ROUNDDOWN(KERNBASE, PGSIZE); i < npage * PGSIZE; i += PGSIZE)
+    uintptr_t pa_begin = ROUNDDOWN(KERNBASE - va_pa_offset, PGSIZE);
+    uintptr_t pa_end = npage << PGSHIFT;
+    const uintptr_t gigapage_size = (uintptr_t)1 << PDX1SHIFT;
+    const uintptr_t megapage_size = (uintptr_t)1 << PDX0SHIFT;
+    const pte_t leaf_permissions = PTE_R | PTE_W | PTE_X;
+
+    for (uintptr_t pa = pa_begin; pa < pa_end; pa += PGSIZE)
     {
-        assert((ptep = get_pte(boot_pgdir_va, (uintptr_t)KADDR(i), 0)) != NULL);
-        assert(PTE_ADDR(*ptep) == i);
+        uintptr_t va = (uintptr_t)KADDR(pa);
+        pde_t pde1 = boot_pgdir_va[PDX1(va)];
+        assert(pde1 & PTE_V);
+
+        uintptr_t mapped_pa;
+        if (pde1 & leaf_permissions)
+        {
+            uintptr_t base = PDE_ADDR(pde1) & ~(gigapage_size - 1);
+            mapped_pa = base | (va & (gigapage_size - 1));
+        }
+        else
+        {
+            pde_t *pd0 = (pde_t *)KADDR(PDE_ADDR(pde1));
+            pde_t pde0 = pd0[PDX0(va)];
+            assert(pde0 & PTE_V);
+            if (pde0 & leaf_permissions)
+            {
+                uintptr_t base = PDE_ADDR(pde0) & ~(megapage_size - 1);
+                mapped_pa = base | (va & (megapage_size - 1));
+            }
+            else
+            {
+                pte_t *ptep = get_pte(boot_pgdir_va, va, 0);
+                assert(ptep != NULL && (*ptep & PTE_V));
+                mapped_pa = PTE_ADDR(*ptep) | PGOFF(va);
+            }
+        }
+        assert(mapped_pa == pa);
     }
 
     assert(boot_pgdir_va[0] == 0);
