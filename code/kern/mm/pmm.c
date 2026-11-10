@@ -329,6 +329,7 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 }
 
 // Insert a 4 KiB page mapping, replacing any existing mapping at la.
+// 2412700
 int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
 {
     if (pgdir == NULL || page == NULL)
@@ -380,6 +381,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
 
 // Remove the mapping at la and release its physical page when the last
 // mapping reference is gone.
+// 2412700
 void page_remove(pde_t *pgdir, uintptr_t la)
 {
     if (pgdir == NULL)
