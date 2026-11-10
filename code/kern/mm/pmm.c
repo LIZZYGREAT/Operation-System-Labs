@@ -335,6 +335,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
     {
         return -E_INVAL;
     }
+    ppn_t ppn = page2ppn(page);
 
     const pte_t leaf_permissions = PTE_R | PTE_W | PTE_X;
     pde_t *pdep1 = &pgdir[PDX1(la)];
@@ -372,7 +373,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
         }
     }
 
-    *ptep = pte_create(page2ppn(page), perm);
+    *ptep = pte_create(ppn, perm);
     tlb_invalidate(pgdir, la);
     return 0;
 }
