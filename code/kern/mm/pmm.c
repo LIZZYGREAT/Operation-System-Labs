@@ -299,13 +299,31 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
     return NULL;
 }
 
-//LAB4 function1 YOUR CODE
+// Remove the mapping at la and release its physical page when the last
+// mapping reference is gone.
+void page_remove(pde_t *pgdir, uintptr_t la)
+{
+    if (pgdir == NULL)
+    {
+        return;
+    }
 
+    pte_t *ptep = get_pte(pgdir, la, 0);
+    if (ptep == NULL || !(*ptep & PTE_V))
+    {
+        return;
+    }
 
+    struct Page *page = pte2page(*ptep);
+    assert(page_ref(page) > 0);
 
-
-
-
+    *ptep = 0;
+    tlb_invalidate(pgdir, la);
+    if (page_ref_dec(page) == 0)
+    {
+        free_page(page);
+    }
+}
 
 // invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
