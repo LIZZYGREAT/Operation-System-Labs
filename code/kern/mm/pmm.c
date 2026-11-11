@@ -255,7 +255,18 @@ void pmm_init(void)
 // return vaule: the kernel virtual address of this pte
 pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 {
+    if (pgdir == NULL)
+    {
+        return NULL;
+    }
+
+    bool pdep1_created = 0;
     pde_t *pdep1 = &pgdir[PDX1(la)];
+    if ((*pdep1 & PTE_V) && (*pdep1 & (PTE_R | PTE_W | PTE_X)))
+    {
+        // This address is covered by a superpage leaf, not a page table.
+        return NULL;
+    }
     if (!(*pdep1 & PTE_V))
     {
         struct Page *page;
@@ -267,13 +278,31 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
         uintptr_t pa = page2pa(page);
         memset(KADDR(pa), 0, PGSIZE);
         *pdep1 = pte_create(page2ppn(page), PTE_U | PTE_V);
+        pdep1_created = 1;
     }
     pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];
+    if ((*pdep0 & PTE_V) && (*pdep0 & (PTE_R | PTE_W | PTE_X)))
+    {
+        // The next level is also allowed to contain a superpage leaf.
+        return NULL;
+    }
     if (!(*pdep0 & PTE_V))
     {
         struct Page *page;
-        if (!create || (page = alloc_page()) == NULL)
+        if (!create)
         {
+            return NULL;
+        }
+        if ((page = alloc_page()) == NULL)
+        {
+            if (pdep1_created)
+            {
+                struct Page *pdep1_page = pte2page(*pdep1);
+                *pdep1 = 0;
+                tlb_invalidate(pgdir, la);
+                assert(page_ref_dec(pdep1_page) == 0);
+                free_page(pdep1_page);
+            }
             return NULL;
         }
         set_page_ref(page, 1);
@@ -299,13 +328,83 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
     return NULL;
 }
 
-//LAB4 function1 YOUR CODE
+// Insert a 4 KiB page mapping, replacing any existing mapping at la.
+// 2412700
+int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
+{
+    if (pgdir == NULL || page == NULL)
+    {
+        return -E_INVAL;
+    }
+    ppn_t ppn = page2ppn(page);
 
+    const pte_t leaf_permissions = PTE_R | PTE_W | PTE_X;
+    pde_t *pdep1 = &pgdir[PDX1(la)];
+    if (*pdep1 & PTE_V)
+    {
+        if (*pdep1 & leaf_permissions)
+        {
+            return -E_INVAL;
+        }
+        pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];
+        if ((*pdep0 & PTE_V) && (*pdep0 & leaf_permissions))
+        {
+            return -E_INVAL;
+        }
+    }
 
+    pte_t *ptep = get_pte(pgdir, la, 1);
+    if (ptep == NULL)
+    {
+        return -E_NO_MEM;
+    }
 
+    page_ref_inc(page);
+    if (*ptep & PTE_V)
+    {
+        struct Page *mapped_page = pte2page(*ptep);
+        if (mapped_page == page)
+        {
+            // Keep the existing reference while updating permissions.
+            page_ref_dec(page);
+        }
+        else
+        {
+            page_remove(pgdir, la);
+        }
+    }
 
+    *ptep = pte_create(ppn, perm);
+    tlb_invalidate(pgdir, la);
+    return 0;
+}
 
+// Remove the mapping at la and release its physical page when the last
+// mapping reference is gone.
+// 2412700
+void page_remove(pde_t *pgdir, uintptr_t la)
+{
+    if (pgdir == NULL)
+    {
+        return;
+    }
 
+    pte_t *ptep = get_pte(pgdir, la, 0);
+    if (ptep == NULL || !(*ptep & PTE_V))
+    {
+        return;
+    }
+
+    struct Page *page = pte2page(*ptep);
+    assert(page_ref(page) > 0);
+
+    *ptep = 0;
+    tlb_invalidate(pgdir, la);
+    if (page_ref_dec(page) == 0)
+    {
+        free_page(page);
+    }
+}
 
 // invalidate a TLB entry, but only if the page tables being
 // edited are the ones currently in use by the processor.
@@ -387,15 +486,45 @@ static void check_pgdir(void)
 static void check_boot_pgdir(void)
 {
     size_t nr_free_store;
-    pte_t *ptep;
-    int i;
 
     nr_free_store = nr_free_pages();
 
-    for (i = ROUNDDOWN(KERNBASE, PGSIZE); i < npage * PGSIZE; i += PGSIZE)
+    uintptr_t pa_begin = ROUNDDOWN(KERNBASE - va_pa_offset, PGSIZE);
+    uintptr_t pa_end = npage << PGSHIFT;
+    const uintptr_t gigapage_size = (uintptr_t)1 << PDX1SHIFT;
+    const uintptr_t megapage_size = (uintptr_t)1 << PDX0SHIFT;
+    const pte_t leaf_permissions = PTE_R | PTE_W | PTE_X;
+
+    for (uintptr_t pa = pa_begin; pa < pa_end; pa += PGSIZE)
     {
-        assert((ptep = get_pte(boot_pgdir_va, (uintptr_t)KADDR(i), 0)) != NULL);
-        assert(PTE_ADDR(*ptep) == i);
+        uintptr_t va = (uintptr_t)KADDR(pa);
+        pde_t pde1 = boot_pgdir_va[PDX1(va)];
+        assert(pde1 & PTE_V);
+
+        uintptr_t mapped_pa;
+        if (pde1 & leaf_permissions)
+        {
+            uintptr_t base = PDE_ADDR(pde1) & ~(gigapage_size - 1);
+            mapped_pa = base | (va & (gigapage_size - 1));
+        }
+        else
+        {
+            pde_t *pd0 = (pde_t *)KADDR(PDE_ADDR(pde1));
+            pde_t pde0 = pd0[PDX0(va)];
+            assert(pde0 & PTE_V);
+            if (pde0 & leaf_permissions)
+            {
+                uintptr_t base = PDE_ADDR(pde0) & ~(megapage_size - 1);
+                mapped_pa = base | (va & (megapage_size - 1));
+            }
+            else
+            {
+                pte_t *ptep = get_pte(boot_pgdir_va, va, 0);
+                assert(ptep != NULL && (*ptep & PTE_V));
+                mapped_pa = PTE_ADDR(*ptep) | PGOFF(va);
+            }
+        }
+        assert(mapped_pa == pa);
     }
 
     assert(boot_pgdir_va[0] == 0);
