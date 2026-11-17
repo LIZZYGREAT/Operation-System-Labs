@@ -433,15 +433,38 @@ static void check_pgdir(void)
     assert(npage <= KERNTOP / PGSIZE);
     assert(boot_pgdir_va != NULL && (uint32_t)PGOFF(boot_pgdir_va) == 0);
     assert(get_page(boot_pgdir_va, 0x0, NULL) == NULL);
+    assert(nr_free_pages() == nr_free_store);
 
     struct Page *p1, *p2;
     p1 = alloc_page();
+    assert(p1 != NULL);
+    assert(page_insert(NULL, p1, 0x0, 0) == -E_INVAL);
+    assert(page_insert(boot_pgdir_va, NULL, 0x0, 0) == -E_INVAL);
+    assert(page_ref(p1) == 0);
+
+    p2 = alloc_page();
+    assert(p2 != NULL);
+    pde_t kernel_superpage = boot_pgdir_va[PDX1(KERNBASE)];
+    assert((kernel_superpage & (PTE_R | PTE_W | PTE_X)) != 0);
+    assert(page_insert(boot_pgdir_va, p2, KERNBASE, 0) == -E_INVAL);
+    assert(boot_pgdir_va[PDX1(KERNBASE)] == kernel_superpage);
+    assert(page_ref(p2) == 0);
+    free_page(p2);
+
     assert(page_insert(boot_pgdir_va, p1, 0x0, 0) == 0);
 
     pte_t *ptep;
     assert((ptep = get_pte(boot_pgdir_va, 0x0, 0)) != NULL);
     assert(pte2page(*ptep) == p1);
     assert(page_ref(p1) == 1);
+
+    // 2412700: same-page remap updates permissions without changing resources.
+    size_t nr_free_mapped = nr_free_pages();
+    assert(page_insert(boot_pgdir_va, p1, 0x0, PTE_U | PTE_W) == 0);
+    assert((ptep = get_pte(boot_pgdir_va, 0x0, 0)) != NULL);
+    assert(pte2page(*ptep) == p1);
+    assert((*ptep & (PTE_U | PTE_W)) == (PTE_U | PTE_W));
+    assert(page_ref(p1) == 1 && nr_free_pages() == nr_free_mapped);
 
     ptep = (pte_t *)KADDR(PDE_ADDR(boot_pgdir_va[0]));
     ptep = (pte_t *)KADDR(PDE_ADDR(ptep[0])) + 1;
@@ -465,10 +488,23 @@ static void check_pgdir(void)
     page_remove(boot_pgdir_va, 0x0);
     assert(page_ref(p1) == 1);
     assert(page_ref(p2) == 0);
+    assert(get_page(boot_pgdir_va, 0x0, NULL) == NULL);
+    assert(get_page(boot_pgdir_va, PGSIZE, NULL) == p1);
+
+    // Removing an absent mapping twice must not release the aliased page.
+    size_t nr_free_after_first_remove = nr_free_pages();
+    page_remove(boot_pgdir_va, 0x0);
+    assert(page_ref(p1) == 1);
+    assert(nr_free_pages() == nr_free_after_first_remove);
 
     page_remove(boot_pgdir_va, PGSIZE);
     assert(page_ref(p1) == 0);
     assert(page_ref(p2) == 0);
+
+    // Repeating removal must not free the leaf page more than once.
+    size_t nr_free_after_last_remove = nr_free_pages();
+    page_remove(boot_pgdir_va, PGSIZE);
+    assert(page_ref(p1) == 0 && nr_free_pages() == nr_free_after_last_remove);
 
     assert(page_ref(pde2page(boot_pgdir_va[0])) == 1);
 
@@ -479,6 +515,19 @@ static void check_pgdir(void)
     flush_tlb();
 
     assert(nr_free_store == nr_free_pages());
+
+    // Leave one free page: get_pte must roll back its first table allocation
+    // when it cannot allocate the second level, and page_insert must fail.
+    size_t nr_free_before_oom = nr_free_pages();
+    assert(nr_free_before_oom > 1);
+    struct Page *reserved = alloc_pages(nr_free_before_oom - 1);
+    assert(reserved != NULL && nr_free_pages() == 1);
+    assert(boot_pgdir_va[PDX1(0)] == 0);
+    assert(page_insert(boot_pgdir_va, reserved, 0, 0) == -E_NO_MEM);
+    assert(boot_pgdir_va[PDX1(0)] == 0);
+    assert(page_ref(reserved) == 0 && nr_free_pages() == 1);
+    free_pages(reserved, nr_free_before_oom - 1);
+    assert(nr_free_pages() == nr_free_before_oom);
 
     cprintf("check_pgdir() succeeded!\n");
 }
