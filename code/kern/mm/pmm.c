@@ -441,6 +441,16 @@ static void check_pgdir(void)
     assert(page_insert(NULL, p1, 0x0, 0) == -E_INVAL);
     assert(page_insert(boot_pgdir_va, NULL, 0x0, 0) == -E_INVAL);
     assert(page_ref(p1) == 0);
+
+    p2 = alloc_page();
+    assert(p2 != NULL);
+    pde_t kernel_superpage = boot_pgdir_va[PDX1(KERNBASE)];
+    assert((kernel_superpage & (PTE_R | PTE_W | PTE_X)) != 0);
+    assert(page_insert(boot_pgdir_va, p2, KERNBASE, 0) == -E_INVAL);
+    assert(boot_pgdir_va[PDX1(KERNBASE)] == kernel_superpage);
+    assert(page_ref(p2) == 0);
+    free_page(p2);
+
     assert(page_insert(boot_pgdir_va, p1, 0x0, 0) == 0);
 
     pte_t *ptep;
@@ -505,6 +515,19 @@ static void check_pgdir(void)
     flush_tlb();
 
     assert(nr_free_store == nr_free_pages());
+
+    // Leave one free page: get_pte must roll back its first table allocation
+    // when it cannot allocate the second level, and page_insert must fail.
+    size_t nr_free_before_oom = nr_free_pages();
+    assert(nr_free_before_oom > 1);
+    struct Page *reserved = alloc_pages(nr_free_before_oom - 1);
+    assert(reserved != NULL && nr_free_pages() == 1);
+    assert(boot_pgdir_va[PDX1(0)] == 0);
+    assert(page_insert(boot_pgdir_va, reserved, 0, 0) == -E_NO_MEM);
+    assert(boot_pgdir_va[PDX1(0)] == 0);
+    assert(page_ref(reserved) == 0 && nr_free_pages() == 1);
+    free_pages(reserved, nr_free_before_oom - 1);
+    assert(nr_free_pages() == nr_free_before_oom);
 
     cprintf("check_pgdir() succeeded!\n");
 }
