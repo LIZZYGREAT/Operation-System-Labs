@@ -277,7 +277,7 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
         set_page_ref(page, 1);
         uintptr_t pa = page2pa(page);
         memset(KADDR(pa), 0, PGSIZE);
-        *pdep1 = pte_create(page2ppn(page), PTE_U | PTE_V);
+        *pdep1 = ptd_create(page2ppn(page));
         pdep1_created = 1;
     }
     pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];
@@ -308,7 +308,7 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
         set_page_ref(page, 1);
         uintptr_t pa = page2pa(page);
         memset(KADDR(pa), 0, PGSIZE);
-        *pdep0 = pte_create(page2ppn(page), PTE_U | PTE_V);
+        *pdep0 = ptd_create(page2ppn(page));
     }
     return &((pte_t *)KADDR(PDE_ADDR(*pdep0)))[PTX(la)];
 }
@@ -466,8 +466,13 @@ static void check_pgdir(void)
     assert((*ptep & (PTE_U | PTE_W)) == (PTE_U | PTE_W));
     assert(page_ref(p1) == 1 && nr_free_pages() == nr_free_mapped);
 
-    ptep = (pte_t *)KADDR(PDE_ADDR(boot_pgdir_va[0]));
-    ptep = (pte_t *)KADDR(PDE_ADDR(ptep[0])) + 1;
+    const pte_t nonleaf_forbidden = PTE_R | PTE_W | PTE_X | PTE_U | PTE_A | PTE_D;
+    pde_t pde1 = boot_pgdir_va[0];
+    assert((pde1 & PTE_V) && (pde1 & nonleaf_forbidden) == 0);
+    ptep = (pte_t *)KADDR(PDE_ADDR(pde1));
+    pde_t pde0 = ptep[0];
+    assert((pde0 & PTE_V) && (pde0 & nonleaf_forbidden) == 0);
+    ptep = (pte_t *)KADDR(PDE_ADDR(pde0)) + 1;
     assert(get_pte(boot_pgdir_va, PGSIZE, 0) == ptep);
 
     p2 = alloc_page();
@@ -475,7 +480,6 @@ static void check_pgdir(void)
     assert((ptep = get_pte(boot_pgdir_va, PGSIZE, 0)) != NULL);
     assert(*ptep & PTE_U);
     assert(*ptep & PTE_W);
-    assert(boot_pgdir_va[0] & PTE_U);
     assert(page_ref(p2) == 1);
 
     assert(page_insert(boot_pgdir_va, p1, PGSIZE, 0) == 0);
@@ -584,6 +588,9 @@ static void check_boot_pgdir(void)
     assert(page_ref(p) == 1);
     assert(page_insert(boot_pgdir_va, p, 0x100 + PGSIZE, PTE_W | PTE_R) == 0);
     assert(page_ref(p) == 2);
+    pte_t *ptep = get_pte(boot_pgdir_va, 0x100, 0);
+    assert(ptep != NULL && pte2page(*ptep) == p);
+    assert((*ptep & (PTE_R | PTE_W)) == (PTE_R | PTE_W));
 
     const char *str = "ucore: Hello world!!";
     strcpy((void *)0x100, str);

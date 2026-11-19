@@ -85,8 +85,14 @@ void switch_to(struct context *from, struct context *to);
 char *
 set_proc_name(struct proc_struct *proc, const char *name)
 {
+    size_t length = 0;
+    while (length < PROC_NAME_LEN && name[length] != '\0')
+    {
+        length++;
+    }
     memset(proc->name, 0, sizeof(proc->name));
-    return memcpy(proc->name, name, PROC_NAME_LEN);
+    memcpy(proc->name, name, length);
+    return proc->name;
 }
 
 // get_proc_name - get the name of proc
