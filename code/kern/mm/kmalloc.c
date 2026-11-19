@@ -76,6 +76,9 @@ typedef struct bigblock bigblock_t;
 static slob_t arena = {.next = &arena, .units = 1};
 static slob_t *slobfree = &arena;
 static bigblock_t *bigblocks;
+#ifdef LAB4_KMALLOC_SELFTEST
+static void check_large_allocations(void);
+#endif
 
 static void *__slob_get_free_pages(gfp_t gfp, int order)
 {
@@ -89,7 +92,7 @@ static void *__slob_get_free_pages(gfp_t gfp, int order)
 
 static inline void __slob_free_pages(unsigned long kva, int order)
 {
-	free_pages(kva2page(kva), 1 << order);
+	free_pages(kva2page((void *)kva), 1 << order);
 }
 
 static void slob_free(void *b, int size);
@@ -202,6 +205,9 @@ inline void
 kmalloc_init(void)
 {
 	slob_init();
+#ifdef LAB4_KMALLOC_SELFTEST
+	check_large_allocations();
+#endif
 	cprintf("kmalloc_init() succeeded!\n");
 }
 
@@ -217,11 +223,21 @@ kallocated(void)
 	return slob_allocated();
 }
 
-static int find_order(int size)
+static int find_order(size_t size)
 {
+	size_t pages = size / PAGE_SIZE;
+	if (size % PAGE_SIZE != 0)
+		pages++;
+
+	size_t capacity = 1;
 	int order = 0;
-	for (; size > 4096; size >>= 1)
+	while (capacity < pages)
+	{
+		if (order >= KMALLOC_MAX_ORDER)
+			return -1;
+		capacity <<= 1;
 		order++;
+	}
 	return order;
 }
 
@@ -230,18 +246,22 @@ static void *__kmalloc(size_t size, gfp_t gfp)
 	slob_t *m;
 	bigblock_t *bb;
 	unsigned long flags;
+	int order;
 
 	if (size < PAGE_SIZE - SLOB_UNIT)
 	{
 		m = slob_alloc(size + SLOB_UNIT, gfp, 0);
 		return m ? (void *)(m + 1) : 0;
 	}
+	order = find_order(size);
+	if (order < 0)
+		return 0;
 
 	bb = slob_alloc(sizeof(bigblock_t), gfp, 0);
 	if (!bb)
 		return 0;
 
-	bb->order = find_order(size);
+	bb->order = order;
 	bb->pages = (void *)__slob_get_free_pages(gfp, bb->order);
 
 	if (bb->pages)
@@ -315,3 +335,36 @@ unsigned int ksize(const void *block)
 
 	return ((slob_t *)block - 1)->units * SLOB_UNIT;
 }
+
+#ifdef LAB4_KMALLOC_SELFTEST
+static void check_large_allocations(void)
+{
+	static const size_t requests[] = {4096, 8192, 8193, 16384, 16385};
+	void *warmup = kmalloc(1);
+	assert(warmup != NULL);
+	kfree(warmup);
+
+	for (size_t i = 0; i < sizeof(requests) / sizeof(requests[0]); i++)
+	{
+		size_t requested = requests[i];
+		size_t free_before = nr_free_pages();
+		volatile unsigned char *block = kmalloc(requested);
+		assert(block != NULL);
+		assert(ksize((const void *)block) >= requested);
+
+		for (size_t offset = 0; offset < requested; offset += PAGE_SIZE)
+			block[offset] = (unsigned char)(offset / PAGE_SIZE);
+		block[requested - 1] = 0xA5;
+		assert(block[requested - 1] == 0xA5);
+
+		kfree((void *)block);
+		assert(nr_free_pages() == free_before);
+	}
+
+	size_t free_before_oversized = nr_free_pages();
+	size_t oversized = PAGE_SIZE * ((size_t)1 << (KMALLOC_MAX_ORDER + 1));
+	assert(kmalloc(oversized) == NULL);
+	assert(nr_free_pages() == free_before_oversized);
+	cprintf("[kmalloc boundary] PASS\n");
+}
+#endif
