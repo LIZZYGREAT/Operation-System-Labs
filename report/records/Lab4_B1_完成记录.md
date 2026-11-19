@@ -14,7 +14,7 @@
 
 现有 `set_proc_name` 固定读取 15 字节，本次调用使用完整大小的名称缓冲区，避免从短字符串字面量越界读取；未修改共享名称接口。
 
-四段式需求提示词见 [prompt_yh.md](./prompt_yh.md)，不记录实际对话。原 `prompt_个人.md` 未修改。
+四段式需求提示词见 [prompt_yh.md](../prompts/prompt_yh.md)，不记录实际对话。原 `prompt_个人.md` 未修改。
 
 ## 验证结果
 
