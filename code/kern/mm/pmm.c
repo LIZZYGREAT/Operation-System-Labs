@@ -89,6 +89,8 @@ size_t nr_free_pages(void)
 
 // Initialize physical page descriptors and hand the remaining memory to the
 // selected page allocator. The kernel image and descriptors stay reserved.
+// 核心就是找到nbase,npage,kernerl_end,manage_end,free_begin,descriptor_pa,descriptor_end,page_count等量，
+// 然后初始化Pages数组进行管理页
 static void page_init(void)
 {
     extern char end[];
@@ -221,10 +223,12 @@ void pmm_init(void)
     // framework.
     // Then pmm can alloc/free the physical memory.
     // Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
+    // 先初始化pmm_manager，保证对于页面管理的功能和对应函数
     init_pmm_manager();
 
     // detect physical memory space, reserve already used memory,
     // then use pmm->init_memmap to create free page list
+    // 初始化page数组，确定管理的范围
     page_init();
 
     // use pmm->check to verify the correctness of the alloc/free function in a
@@ -319,6 +323,7 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
         *pdep0 = ptd_create(page2ppn(page));
     }
     return &((pte_t *)KADDR(PDE_ADDR(*pdep0)))[PTX(la)];
+    //返回结果两种情况，一是小页+已经存在的pte，二是至少不存在某一级页表页，一步一步创建下来的，返回的新建的page对应下来的“内容为空”的非空指针。
 }
 
 // get_page - get related Page struct for linear address la using PDT pgdir
@@ -371,7 +376,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
     }
 
     pte_t *ptep = get_pte(pgdir, la, 1);
-    if (ptep == NULL)
+    if (ptep == NULL)  //这是指针为空，而不是内容为空，预期内容可能为0
     {
         return -E_NO_MEM;
     }
@@ -396,7 +401,7 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
         }
     }
 
-    *ptep = pte_create(ppn, perm);   
+    *ptep = pte_create(ppn, perm);   //这个ppn是通过函数输入的page得到的，是希望建立最终的物理地址和虚拟地址的关键桥梁。
     tlb_invalidate(pgdir, la);   //刷新TLB
     return 0;
 }
