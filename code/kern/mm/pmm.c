@@ -89,6 +89,8 @@ size_t nr_free_pages(void)
 
 // Initialize physical page descriptors and hand the remaining memory to the
 // selected page allocator. The kernel image and descriptors stay reserved.
+// 核心就是找到nbase,npage,kernerl_end,manage_end,free_begin,descriptor_pa,descriptor_end,page_count等量，
+// 然后初始化Pages数组进行管理页
 static void page_init(void)
 {
     extern char end[];
@@ -221,10 +223,12 @@ void pmm_init(void)
     // framework.
     // Then pmm can alloc/free the physical memory.
     // Now the first_fit/best_fit/worst_fit/buddy_system pmm are available.
+    // 先初始化pmm_manager，保证对于页面管理的功能和对应函数
     init_pmm_manager();
 
     // detect physical memory space, reserve already used memory,
     // then use pmm->init_memmap to create free page list
+    // 初始化page数组，确定管理的范围
     page_init();
 
     // use pmm->check to verify the correctness of the alloc/free function in a
@@ -253,6 +257,11 @@ void pmm_init(void)
 //  la:     the linear address need to map
 //  create: a logical value to decide if alloc a page for PT
 // return vaule: the kernel virtual address of this pte
+//根据一个虚拟地址+pgdir根页表基址===>得到最终映射的pte
+//如果该虚拟地址没有对应的页表存在，那么就需要额外创建页表，建立映射+得到pte。
+//只负责查找对应的pte的位置，不负责把数据页映射过去
+//即根页表--->T1--->T0，而不是VA--->PA
+
 pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 {
     if (pgdir == NULL)
@@ -262,46 +271,49 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
 
     bool pdep1_created = 0;
     pde_t *pdep1 = &pgdir[PDX1(la)];
-    if ((*pdep1 & PTE_V) && (*pdep1 & (PTE_R | PTE_W | PTE_X)))
+    if ((*pdep1 & PTE_V) && (*pdep1 & (PTE_R | PTE_W | PTE_X)))   //pdep1有效+如果是大页分配，则不支持继续拆分，返回NULL
     {
         // This address is covered by a superpage leaf, not a page table.
         return NULL;
     }
-    if (!(*pdep1 & PTE_V))
+    if (!(*pdep1 & PTE_V)) //无效，还未创建对应的下一级页表
     {
         struct Page *page;
-        if (!create || (page = alloc_page()) == NULL)
+        if (!create || (page = alloc_page()) == NULL) //如果允许create，那么这里已经执行了page = alloc_page()的赋值，同时这里还有 || 的短路设计
         {
             return NULL;
         }
-        set_page_ref(page, 1);
-        uintptr_t pa = page2pa(page);
+        set_page_ref(page, 1);      //该级页表引用+1
+        uintptr_t pa = page2pa(page); //获取下一级页表页的首地址
         memset(KADDR(pa), 0, PGSIZE);
-        *pdep1 = ptd_create(page2ppn(page));
+        *pdep1 = ptd_create(page2ppn(page)); //创建对应的pde1项，PPN(26+9+9)+10位。最开始的时候是无效，现在才真正赋值，变为有效，并指向下一级页表页
         pdep1_created = 1;
     }
-    pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];
-    if ((*pdep0 & PTE_V) && (*pdep0 & (PTE_R | PTE_W | PTE_X)))
+    pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];    //Level2的页表项的值转换后得到的Level1的页表基址+VPN[1]===>确定pdep0
+                                                                     //始终通过la找VPN
+    if ((*pdep0 & PTE_V) && (*pdep0 & (PTE_R | PTE_W | PTE_X)))      //如果是大页且有效，返回空。有两种情况，一是，新建的，那么一定不走该分支，
+                                                                     //因为一定还无效，如果是之前就有该层的页表页(对应起来就是Level2是非叶子页)
+                                                                     //那么上一层就没有发生create，自然也就不需要释放资源。
     {
         // The next level is also allowed to contain a superpage leaf.
         return NULL;
     }
-    if (!(*pdep0 & PTE_V))
+    if (!(*pdep0 & PTE_V))  //之前没有该Level0页T0
     {
         struct Page *page;
         if (!create)
         {
             return NULL;
         }
-        if ((page = alloc_page()) == NULL)
+        if ((page = alloc_page()) == NULL)   // 再次进行page分配，如果因为比如内存不足的原因失败
         {
-            if (pdep1_created)
+            if (pdep1_created)   //这就是记录pdep1_created的目的，也就是如果创建level0失败，那么需要收回创建的level1的资源
             {
                 struct Page *pdep1_page = pte2page(*pdep1);
-                *pdep1 = 0;
+                *pdep1 = 0;           //取消映射关系
                 tlb_invalidate(pgdir, la);
                 assert(page_ref_dec(pdep1_page) == 0);
-                free_page(pdep1_page);
+                free_page(pdep1_page); //释放page
             }
             return NULL;
         }
@@ -311,9 +323,12 @@ pte_t *get_pte(pde_t *pgdir, uintptr_t la, bool create)
         *pdep0 = ptd_create(page2ppn(page));
     }
     return &((pte_t *)KADDR(PDE_ADDR(*pdep0)))[PTX(la)];
+    //返回结果两种情况，一是小页+已经存在的pte，二是至少不存在某一级页表页，一步一步创建下来的，返回的新建的page对应下来的“内容为空”的非空指针。
 }
 
 // get_page - get related Page struct for linear address la using PDT pgdir
+// 先page_insert 建立起la和物理内存地址的联系之后，通过get_page获得对应的page，查看是映射到了哪一个物理页。
+// 二级指针是为了 get_page() 有时不仅需要返回 struct Page *，还需要让调用者同时获得对应 PTE 的地址。
 struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 {
     pte_t *ptep = get_pte(pgdir, la, 0);
@@ -329,6 +344,12 @@ struct Page *get_page(pde_t *pgdir, uintptr_t la, pte_t **ptep_store)
 }
 
 // Insert a 4 KiB page mapping, replacing any existing mapping at la.
+// 真正把物理页映射到虚拟页
+// 逻辑是这样的：我已有一个虚拟地址la，我希望建立和物理地址的联系，因此调用例如：page_insert(boot_pgdir_va, p1, 0x403123, PTE_R | PTE_W);
+// 首先要知道，物理地址是靠，alloc_page()进行分配的，那么就很难说固定物理地址，去匹配虚拟地址。
+// 只能是，因为程序需要某一个地址(这个地址必定是虚拟地址)，从而去建立联系。那么已经有了虚拟地址，就可以靠sv39的规则进行解析，去查找是否存在
+// 已经建立好的page或者没有建立的话就自己新建分配对应的页表页。前者就不需要更新ref，主要可能是更新permission，后者就会涉及到更新ref。
+// 注意，如果成功，返回值为0，失败返回值为各种失败码
 // 2412700
 int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
 {
@@ -339,14 +360,15 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
     ppn_t ppn = page2ppn(page);
 
     const pte_t leaf_permissions = PTE_R | PTE_W | PTE_X;
-    pde_t *pdep1 = &pgdir[PDX1(la)];
-    if (*pdep1 & PTE_V)
+    //先排除是否为大页的情况
+    pde_t *pdep1 = &pgdir[PDX1(la)]; // pgdir[vpn[2]]找到对应的pde项对应的指针
+    if (*pdep1 & PTE_V)   //检查是否 V = 1
     {
-        if (*pdep1 & leaf_permissions)
+        if (*pdep1 & leaf_permissions)  // 这里由于leaf_permissions高位全为0，所以本质上是在检查是R,W,X全为0
         {
             return -E_INVAL;
         }
-        pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];
+        pde_t *pdep0 = &((pte_t *)KADDR(PDE_ADDR(*pdep1)))[PDX0(la)];// 先找到Level1的页表+VPN[1]===>pde[0]
         if ((*pdep0 & PTE_V) && (*pdep0 & leaf_permissions))
         {
             return -E_INVAL;
@@ -354,11 +376,16 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
     }
 
     pte_t *ptep = get_pte(pgdir, la, 1);
-    if (ptep == NULL)
+    if (ptep == NULL)  //这是指针为空，而不是内容为空，预期内容可能为0
     {
         return -E_NO_MEM;
     }
 
+    //重点理解此处逻辑：如果说，get_pte是通过create创建的新的Level 0那么此时*ptep是为0(但是ptep!=NULL,已经被分配了空间，但是还没有赋值)
+    //必然不会走if (*ptep & PTE_V)分支，而是直接pte_create创建联系(ppn是通过page获得的)所以直接就建立了la和page的关系
+    //如果说，之前就已经存在了Level 0，那么就需要检查，*ptep中PPN--->page是否和函数传入的输入page一致
+    //如果page一致，那么久ref保持和原来一致，稍后可能只需要对perm进行更新即可。
+    //如果page不一致，那么清除掉la之前的映射，稍后重新建立与传入的page的映射关系
     page_ref_inc(page);
     if (*ptep & PTE_V)
     {
@@ -374,13 +401,56 @@ int page_insert(pde_t *pgdir, struct Page *page, uintptr_t la, uint32_t perm)
         }
     }
 
-    *ptep = pte_create(ppn, perm);
-    tlb_invalidate(pgdir, la);
+    *ptep = pte_create(ppn, perm);   //这个ppn是通过函数输入的page得到的，是希望建立最终的物理地址和虚拟地址的关键桥梁。
+    tlb_invalidate(pgdir, la);   //刷新TLB
     return 0;
 }
 
+/*清晰逻辑一览：
+page_insert(pgdir, page, la, perm)
+               │
+               ▼
+       检查参数是否合法
+               │
+               ▼
+       将 page 转换为 PPN
+               │
+               ▼
+       检查上层大页冲突
+               │
+               ▼
+       get_pte(pgdir, la, 1)
+               │
+               ▼
+       得到目标叶子 PTE 地址
+               │
+               ▼
+       新物理页 ref + 1
+               │
+               ▼
+       原来是否已经映射？
+               │
+       ┌───────┼───────────┐
+       │       │           │
+      没有    同一物理页   不同物理页
+       │       │           │
+       │      ref - 1      page_remove()
+       │       │           │
+       └───────┴───────────┘
+               │
+               ▼
+       写入新的 PPN 和权限
+               │
+               ▼
+       tlb_invalidate()
+               │
+               ▼
+            return 0
+*/
+
 // Remove the mapping at la and release its physical page when the last
 // mapping reference is gone.
+// 清除虚拟地址和物理页之间的映射联系并收回资源。
 // 2412700
 void page_remove(pde_t *pgdir, uintptr_t la)
 {
@@ -391,6 +461,8 @@ void page_remove(pde_t *pgdir, uintptr_t la)
 
     pte_t *ptep = get_pte(pgdir, la, 0);
     if (ptep == NULL || !(*ptep & PTE_V))
+    //第一种是没有找到目标 PTE。第二种是找到了目标 PTE 的位置，但是其有效位为 0。
+    //这两种情况都说明没有需要删除的有效映射，直接结束。
     {
         return;
     }
@@ -404,6 +476,7 @@ void page_remove(pde_t *pgdir, uintptr_t la)
     {
         free_page(page);
     }
+    //实际只进行回收了Level 0的页表，没有进行处理回溯上层的页表。
 }
 
 // invalidate a TLB entry, but only if the page tables being
